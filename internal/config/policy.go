@@ -88,8 +88,27 @@ func DefaultWAF() WAFPolicy {
 	return WAFPolicy{Enabled: true, ParanoiaLevel: 1, Threshold: 5}
 }
 
-// ApplyDefaults fills unset fields on an app loaded from storage.
+// ApplyDefaults fills unset fields on an app loaded from storage and normalizes
+// nil slices to empty ones, which the array columns require.
 func (a *App) ApplyDefaults() {
+	if a.Hostnames == nil {
+		a.Hostnames = []string{}
+	}
+	if a.TrustedCIDRs == nil {
+		a.TrustedCIDRs = []string{}
+	}
+	if a.Capture.SkipPaths == nil {
+		a.Capture.SkipPaths = []string{}
+	}
+	if a.Redaction.Headers == nil {
+		a.Redaction.Headers = []string{}
+	}
+	if a.Redaction.Fields == nil {
+		a.Redaction.Fields = []string{}
+	}
+	if a.WAF.ExtraRules == nil {
+		a.WAF.ExtraRules = []string{}
+	}
 	if a.ClientIPHeader == "" {
 		a.ClientIPHeader = "X-Real-IP"
 	}
