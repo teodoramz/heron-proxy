@@ -13,6 +13,8 @@ type Event struct {
 	ID    string    `json:"id"`
 	AppID string    `json:"app_id"`
 
+	RetentionDays uint16 `json:"retention_days"`
+
 	ClientIP        netip.Addr `json:"client_ip"`
 	ClientIPClaimed netip.Addr `json:"client_ip_claimed"`
 	ClientPort      uint16     `json:"client_port"`
