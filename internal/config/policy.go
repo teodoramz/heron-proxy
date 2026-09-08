@@ -1,6 +1,9 @@
 package config
 
-import "time"
+import (
+	"net/netip"
+	"time"
+)
 
 // CapturePolicy controls how much of a request is recorded.
 type CapturePolicy struct {
@@ -45,7 +48,17 @@ type App struct {
 	Enabled           bool            `json:"enabled"`
 	CreatedAt         time.Time       `json:"created_at"`
 	UpdatedAt         time.Time       `json:"updated_at"`
+
+	// trusted is the parsed form of TrustedCIDRs, precomputed when the app is
+	// loaded so the request path does no parsing.
+	trusted []netip.Prefix
 }
+
+// SetTrusted stores the parsed trusted-proxy prefixes.
+func (a *App) SetTrusted(p []netip.Prefix) { a.trusted = p }
+
+// TrustedPrefixes returns the parsed trusted-proxy prefixes.
+func (a *App) TrustedPrefixes() []netip.Prefix { return a.trusted }
 
 // DefaultCapture returns the capture policy applied to a new app.
 func DefaultCapture() CapturePolicy {

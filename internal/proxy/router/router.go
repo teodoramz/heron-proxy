@@ -42,6 +42,7 @@ func (r *Router) Replace(apps []config.App) {
 		app := apps[i]
 		app.ApplyDefaults()
 		stored := &app
+		stored.SetTrusted(ParseCIDRs(app.TrustedCIDRs))
 		next.byID[app.ID] = stored
 		next.all = append(next.all, stored)
 		if !app.Enabled {
