@@ -54,6 +54,40 @@ done before deciding whether to enforce it.
 - **Answers questions fast** — ClickHouse with keyset pagination, so page 10,000
   costs what page 1 costs.
 
+## What it looks like
+
+**Traffic** — every request, newest first. Plain-language filters, 28 selectable
+columns, resizable and sortable, keyset pagination, live tail.
+
+![Traffic](docs/screenshots/traffic.png)
+
+**Request detail** — the body, every header, and the whole request as raw HTTP,
+curl or HAR. Sensitive values are redacted on the way in.
+
+![Request detail](docs/screenshots/detail.png)
+
+**Rule tuning** — what enforcing would have cost at each threshold, and the
+rules that fired ranked by volume. Read a rule's matches, mark it a false
+positive, exclude it.
+
+![Rule tuning](docs/screenshots/tuning.png)
+
+**Dashboard** — volume, suspicious and rejected counts, latency percentiles,
+and the rules, sources and paths behind them.
+
+![Dashboard](docs/screenshots/dashboard.png)
+
+**Rules** — all 625 CRS rules, searchable by number, description or tag, each
+linking to its own matches in your traffic.
+
+![Rules](docs/screenshots/rules.png)
+
+**Applications** — hostnames, upstream, trusted proxies, paranoia, threshold,
+retention and enforcement mode. Certificates are uploaded here, or minted by
+the built-in authority.
+
+![Applications](docs/screenshots/apps.png)
+
 ## Quickstart
 
 Requires Docker with Compose v2.

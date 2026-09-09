@@ -88,7 +88,8 @@ export function Tuning() {
           separates them. Work down the rules below: open the requests a rule matched, decide whether
           it caught an attack or your own users, and exclude the ones that are wrong. Then use the
           threshold ladder to see what enforcing would have cost.{' '}
-          <strong>Nothing here blocks traffic</strong> — this proxy only ever records.
+          <strong>Nothing here changes what the proxy does</strong> — enforcement is switched on per
+          application, under Applications.
         </p>
 
         <ThresholdLadder
