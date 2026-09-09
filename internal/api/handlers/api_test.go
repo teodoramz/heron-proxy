@@ -843,3 +843,48 @@ func TestReplayRejectsUnparseableRaw(t *testing.T) {
 		t.Errorf("status = %d, want 400", resp.StatusCode)
 	}
 }
+
+func TestRuleCatalogueEndpoints(t *testing.T) {
+	h := newHarness(t)
+	c := h.login(t, "viewer@example.test", store.RoleViewer, nil)
+
+	var facets struct {
+		Total      int      `json:"total"`
+		Tags       []string `json:"tags"`
+		Categories []string `json:"categories"`
+	}
+	c.decode(c.get("/api/rules/facets"), http.StatusOK, &facets)
+	if facets.Total < 300 || len(facets.Tags) == 0 || len(facets.Categories) == 0 {
+		t.Fatalf("facets look wrong: %+v", facets)
+	}
+
+	var page struct {
+		Rules []struct {
+			ID      int    `json:"id"`
+			Message string `json:"message"`
+		} `json:"rules"`
+		Total int `json:"total"`
+	}
+	c.decode(c.get("/api/rules?q=sql&limit=5"), http.StatusOK, &page)
+	if page.Total == 0 || len(page.Rules) == 0 {
+		t.Fatalf("search returned nothing: %+v", page)
+	}
+	if len(page.Rules) > 5 {
+		t.Errorf("limit ignored: got %d rules", len(page.Rules))
+	}
+
+	var rule struct {
+		ID     int    `json:"id"`
+		Source string `json:"source"`
+	}
+	c.decode(c.get("/api/rules/942100"), http.StatusOK, &rule)
+	if rule.ID != 942100 || rule.Source == "" {
+		t.Errorf("rule detail wrong: %+v", rule)
+	}
+
+	resp := c.get("/api/rules/1")
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("unknown rule = %d, want 404", resp.StatusCode)
+	}
+}

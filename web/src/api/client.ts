@@ -1,7 +1,7 @@
 import type {
   AlertRule, App, Certificate, EventDetail, Exclusion, FieldSchema, Filter,
   GroupStat, IPStat, Page, RuleStat, SavedFilter, SeriesPoint, Simulation,
-  Summary, User,
+  RuleFacets, CrsRule, Summary, User,
 } from './types'
 
 export class ApiError extends Error {
@@ -68,6 +68,17 @@ export const api = {
     post<Simulation>(`/api/simulate?threshold=${threshold}`, filter),
   ipProfile: (ip: string, query: string) =>
     request<IPProfile>(`/api/ip/${encodeURIComponent(ip)}?${query}`),
+
+  rules: (q: { q?: string; tag?: string; paranoia?: string; severity?: string; limit?: number; offset?: number }) =>
+    request<{ rules: CrsRule[]; total: number }>(
+      '/api/rules?' +
+        new URLSearchParams(
+          Object.entries(q)
+            .filter(([, v]) => v !== '' && v !== undefined)
+            .map(([k, v]) => [k, String(v)]),
+        ).toString(),
+    ),
+  ruleFacets: () => request<RuleFacets>('/api/rules/facets'),
 
   apps: () => request<{ apps: App[] }>('/api/apps'),
   saveApp: (app: Partial<App>) => post<App>('/api/apps', app),

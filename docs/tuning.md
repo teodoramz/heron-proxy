@@ -33,6 +33,13 @@ detection for every request to the app.
 Exclusions are per application. Rules that should apply everywhere belong in
 `PROXY_RULES_DIR` instead.
 
+## Marking a match
+
+The buttons on a matched rule — **Our own traffic** and **Real attack** — record
+a judgement and nothing else. They do not change detection, do not block, and do
+not alter the rule. What they do is rank the tuning queue and tell whoever looks
+next what you concluded.
+
 ## Choosing a threshold
 
 The anomaly score accumulates across matching rules: critical adds 5, error 4,

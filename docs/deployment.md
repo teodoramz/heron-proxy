@@ -111,6 +111,28 @@ slow requests than lose records. **`spool_dropped_bytes`** counts segments
 discarded at the watermark, which means ClickHouse was unavailable for longer
 than the spool could cover.
 
+### If `docker compose` is missing
+
+If `docker compose` reports `unknown command`, the CLI plugin is not being
+loaded. Check whether the binary is intact:
+
+```bash
+dpkg -V docker-compose                                        # a line of ?? means a corrupt file
+/usr/libexec/docker/cli-plugins/docker-compose docker-cli-plugin-metadata
+```
+
+That command must print JSON. If it prints nothing or segfaults, install a good
+copy for your own user, which needs no root:
+
+```bash
+mkdir -p ~/.docker/cli-plugins
+curl -fsSL -o ~/.docker/cli-plugins/docker-compose \
+  https://github.com/docker/compose/releases/download/v2.40.3/docker-compose-linux-x86_64
+chmod +x ~/.docker/cli-plugins/docker-compose
+```
+
+Docker scans that directory as well as the system one.
+
 ### Backups
 
 - **Postgres** holds every configuration: apps, encrypted certificates, users,

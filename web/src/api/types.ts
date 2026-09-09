@@ -247,3 +247,22 @@ export interface SavedFilter {
   query: Filter
   shared: boolean
 }
+
+export interface CrsRule {
+  id: number
+  message: string
+  tags: string[]
+  severity: string
+  paranoia: number
+  phase: number
+  file: string
+  category: string
+  source: string
+}
+
+export interface RuleFacets {
+  total: number
+  tags: string[]
+  categories: string[]
+  severities: string[]
+}

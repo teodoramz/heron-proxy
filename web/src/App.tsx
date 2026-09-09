@@ -5,6 +5,7 @@ import { Apps } from './routes/Apps'
 import { Dashboard } from './routes/Dashboard'
 import { IPProfileRoute } from './routes/IPProfile'
 import { Login } from './routes/Login'
+import { Rules } from './routes/Rules'
 import { Settings } from './routes/Settings'
 import { Traffic } from './routes/Traffic'
 import { Tuning } from './routes/Tuning'
@@ -32,6 +33,9 @@ export default function App() {
           </NavLink>
           <NavLink className="rail-link" to="/tuning">
             Rule tuning
+          </NavLink>
+          <NavLink className="rail-link" to="/rules">
+            Rules
           </NavLink>
           {atLeast('admin') && (
             <>
@@ -61,6 +65,7 @@ export default function App() {
           <Route path="/" element={<Traffic />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/tuning" element={<Tuning />} />
+          <Route path="/rules" element={<Rules />} />
           <Route path="/ip/:ip" element={<IPProfileRoute />} />
           {atLeast('admin') && <Route path="/apps" element={<Apps />} />}
           {atLeast('admin') && <Route path="/settings" element={<Settings />} />}

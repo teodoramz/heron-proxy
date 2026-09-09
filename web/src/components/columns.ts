@@ -121,3 +121,30 @@ export function saveColumns(ids: string[]): void {
     // A browser with storage blocked simply loses the preference.
   }
 }
+
+
+const WIDTHS_KEY = 'pw-column-widths'
+
+/** Column widths a person has set by dragging, in pixels. */
+export function loadWidths(): Record<string, number> {
+  try {
+    const raw = localStorage.getItem(WIDTHS_KEY)
+    return raw ? (JSON.parse(raw) as Record<string, number>) : {}
+  } catch {
+    return {}
+  }
+}
+
+export function saveWidths(widths: Record<string, number>): void {
+  try {
+    localStorage.setItem(WIDTHS_KEY, JSON.stringify(widths))
+  } catch {
+    // A browser with storage blocked simply loses the preference.
+  }
+}
+
+/** trackFor returns the grid track for a column, honouring a dragged width. */
+export function trackFor(c: ColumnDef, widths: Record<string, number>): string {
+  const w = widths[c.id]
+  return w ? `${w}px` : c.width
+}

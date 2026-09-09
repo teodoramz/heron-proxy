@@ -84,6 +84,11 @@ func NewRouter(o Options) http.Handler {
 	mux.Handle("POST /api/filters", analyst(http.HandlerFunc(h.SaveFilter)))
 	mux.Handle("DELETE /api/filters/{id}", analyst(http.HandlerFunc(h.DeleteFilter)))
 
+	// The rule catalogue is reference material, readable by anyone signed in.
+	mux.Handle("GET /api/rules", viewer(http.HandlerFunc(h.ListRules)))
+	mux.Handle("GET /api/rules/facets", viewer(http.HandlerFunc(h.RuleFacets)))
+	mux.Handle("GET /api/rules/{id}", viewer(http.HandlerFunc(h.GetRule)))
+
 	// Rule tuning.
 	mux.Handle("GET /api/exclusions", viewer(http.HandlerFunc(h.ListExclusions)))
 	mux.Handle("GET /api/exclusions/verdicts", viewer(http.HandlerFunc(h.FPSummaries)))

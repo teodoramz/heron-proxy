@@ -3,18 +3,19 @@ import { useSearchParams } from 'react-router-dom'
 import { api } from '../api/client'
 import { DetailDrawer } from '../components/DetailDrawer'
 import { FilterBar } from '../components/FilterBar'
+import { Pager } from '../components/Pager'
 import { TrafficTable } from '../components/TrafficTable'
-import { loadColumns, saveColumns } from '../components/columns'
+import { loadColumns, loadWidths, saveColumns, saveWidths } from '../components/columns'
 import { useLiveTail } from '../hooks/useLiveTail'
 import type { Filter, TrafficEvent } from '../api/types'
 
-const MAX_LIVE_ROWS = 5000
+const MAX_LIVE_ROWS = 2000
 
 /**
  * initialFilter seeds the view. Rule and app can arrive in the URL, which is how
  * "View requests" on the tuning page lands here already filtered.
  */
-function initialFilter(params: URLSearchParams): Filter {
+function initialFilter(params: URLSearchParams, limit: number): Filter {
   const to = new Date()
   const conditions = []
   const rule = params.get('rule')
@@ -26,15 +27,15 @@ function initialFilter(params: URLSearchParams): Filter {
     to: to.toISOString(),
     apps: app ? [app] : undefined,
     root: { op: 'and', conditions },
-    limit: 200,
+    limit,
   }
 }
 
 export function Traffic() {
   const [params] = useSearchParams()
-  const [filter, setFilter] = useState<Filter>(() => initialFilter(params))
+  const [pageSize, setPageSize] = useState(100)
+  const [filter, setFilter] = useState<Filter>(() => initialFilter(params, 100))
   const [events, setEvents] = useState<TrafficEvent[]>([])
-  const [cursor, setCursor] = useState<string | undefined>()
   const [hasMore, setHasMore] = useState(false)
   const [loading, setLoading] = useState(false)
   const [selected, setSelected] = useState<string | undefined>()
@@ -42,9 +43,14 @@ export function Traffic() {
   const [total, setTotal] = useState<{ count: number; capped: boolean }>()
   const [error, setError] = useState('')
   const [columns, setColumns] = useState<string[]>(loadColumns)
+  const [widths, setWidths] = useState<Record<string, number>>(loadWidths)
   const [autoRefresh, setAutoRefresh] = useState(false)
   const [reloadToken, setReloadToken] = useState(0)
   const [lastLoaded, setLastLoaded] = useState<Date>()
+
+  // One cursor per page start. Index 0 is the first page, which has no cursor.
+  const [cursors, setCursors] = useState<(string | undefined)[]>([undefined])
+  const [page, setPage] = useState(0)
   const requestId = useRef(0)
 
   function chooseColumns(ids: string[]) {
@@ -52,20 +58,44 @@ export function Traffic() {
     saveColumns(ids)
   }
 
+  const resizeColumn = useCallback((id: string, width: number) => {
+    setWidths((prev) => {
+      const next = { ...prev }
+      if (width <= 0) delete next[id]
+      else next[id] = width
+      saveWidths(next)
+      return next
+    })
+  }, [])
+
   const refresh = useCallback(() => setReloadToken((n) => n + 1), [])
 
-  // Reload from the top whenever the filter changes.
+  // Changing the filter or the page size starts again from the first page.
+  useEffect(() => {
+    setCursors([undefined])
+    setPage(0)
+  }, [filter, pageSize])
+
   useEffect(() => {
     const id = ++requestId.current
     setLoading(true)
     setError('')
+
     api
-      .searchTraffic({ ...filter, cursor: undefined })
-      .then((page) => {
+      .searchTraffic({ ...filter, limit: pageSize, cursor: cursors[page] })
+      .then((result) => {
         if (id !== requestId.current) return
-        setEvents(page.events)
-        setCursor(page.next_cursor)
-        setHasMore(page.has_more)
+        setEvents(result.events)
+        setHasMore(result.has_more)
+        // Remember where the next page starts so Older can move forward.
+        if (result.has_more && result.next_cursor) {
+          setCursors((prev) => {
+            if (prev[page + 1] === result.next_cursor) return prev
+            const next = prev.slice(0, page + 1)
+            next[page + 1] = result.next_cursor
+            return next
+          })
+        }
       })
       .catch((e) => id === requestId.current && setError(e.message))
       .finally(() => {
@@ -73,38 +103,32 @@ export function Traffic() {
         setLoading(false)
         setLastLoaded(new Date())
       })
+  }, [filter, pageSize, page, cursors, reloadToken])
 
+  // The count is for the whole filter, not the page, so it only follows the filter.
+  useEffect(() => {
     api
       .countTraffic(filter)
-      .then((c) => id === requestId.current && setTotal({ count: c.count, capped: c.capped }))
+      .then((c) => setTotal({ count: c.count, capped: c.capped }))
       .catch(() => setTotal(undefined))
   }, [filter, reloadToken])
 
-  // Polling covers the gap when live tail is off, and keeps counts current.
+  // Polling covers the gap when live tail is off, and only on the first page:
+  // reloading a later page under a moving cursor would shuffle rows underfoot.
   useEffect(() => {
-    if (!autoRefresh || live) return
+    if (!autoRefresh || live || page !== 0) return
     const timer = setInterval(refresh, 2000)
     return () => clearInterval(timer)
-  }, [autoRefresh, live, refresh])
+  }, [autoRefresh, live, page, refresh])
 
-  const loadMore = useCallback(() => {
-    if (!cursor || loading) return
-    setLoading(true)
-    api
-      .searchTraffic({ ...filter, cursor })
-      .then((page) => {
-        setEvents((prev) => [...prev, ...page.events])
-        setCursor(page.next_cursor)
-        setHasMore(page.has_more)
-      })
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false))
-  }, [cursor, filter, loading])
-
-  // Live events are prepended; the list is capped so memory stays bounded.
-  const onLive = useCallback((e: TrafficEvent) => {
-    setEvents((prev) => [e, ...prev].slice(0, MAX_LIVE_ROWS))
-  }, [])
+  // Live events are prepended, and only while looking at the newest page.
+  const onLive = useCallback(
+    (e: TrafficEvent) => {
+      if (page !== 0) return
+      setEvents((prev) => [e, ...prev].slice(0, MAX_LIVE_ROWS))
+    },
+    [page],
+  )
 
   const connected = useLiveTail(live, filter, onLive)
 
@@ -116,7 +140,6 @@ export function Traffic() {
         live={live}
         liveConnected={connected}
         onToggleLive={() => setLive((v) => !v)}
-        total={total}
         columns={columns}
         onColumnsChange={chooseColumns}
         autoRefresh={autoRefresh}
@@ -129,11 +152,22 @@ export function Traffic() {
       <TrafficTable
         events={events}
         columns={columns}
+        widths={widths}
+        onResize={resizeColumn}
         selectedId={selected}
-        hasMore={hasMore}
         loading={loading}
         onSelect={(e) => setSelected(e.id)}
-        onLoadMore={loadMore}
+      />
+      <Pager
+        page={page}
+        pageSize={pageSize}
+        shown={events.length}
+        total={total}
+        hasMore={hasMore}
+        loading={loading}
+        onPrevious={() => setPage((p) => Math.max(0, p - 1))}
+        onNext={() => setPage((p) => p + 1)}
+        onPageSize={setPageSize}
       />
       {selected && <DetailDrawer id={selected} onClose={() => setSelected(undefined)} />}
     </>

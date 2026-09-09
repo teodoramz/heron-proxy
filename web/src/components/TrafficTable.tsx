@@ -1,41 +1,42 @@
 import { useCallback, useLayoutEffect, useRef, useState } from 'react'
 import type { TrafficEvent } from '../api/types'
-import { COLUMNS_BY_ID, type ColumnDef } from './columns'
+import { COLUMNS_BY_ID, trackFor, type ColumnDef } from './columns'
 import { anomalyLevel } from './format'
 
 const ROW_HEIGHT = 30
 const OVERSCAN = 12
+const MIN_WIDTH = 48
 
 interface Props {
   events: TrafficEvent[]
   columns: string[]
+  widths: Record<string, number>
+  onResize: (id: string, width: number) => void
   selectedId?: string
-  hasMore: boolean
   loading: boolean
   onSelect: (e: TrafficEvent) => void
-  onLoadMore: () => void
 }
 
 /**
- * TrafficTable renders only the rows in view, so a large loaded set stays
- * responsive. Header and rows share one grid template, which is what keeps the
- * columns aligned as the selection changes.
+ * TrafficTable renders only the rows in view, so a large page stays responsive.
+ * Header and rows share one grid template, which is what keeps the columns
+ * aligned as the selection and the dragged widths change.
  */
 export function TrafficTable({
   events,
   columns,
+  widths,
+  onResize,
   selectedId,
-  hasMore,
   loading,
   onSelect,
-  onLoadMore,
 }: Props) {
   const viewport = useRef<HTMLDivElement>(null)
   const [range, setRange] = useState({ start: 0, end: 60 })
 
   const defs = columns.map((id) => COLUMNS_BY_ID.get(id)).filter(Boolean) as ColumnDef[]
   // The leading 4px track is the anomaly gutter.
-  const template = `4px ${defs.map((c) => c.width).join(' ')}`
+  const template = `4px ${defs.map((c) => trackFor(c, widths)).join(' ')}`
 
   const recompute = useCallback(() => {
     const el = viewport.current
@@ -43,18 +44,18 @@ export function TrafficTable({
     const start = Math.max(0, Math.floor(el.scrollTop / ROW_HEIGHT) - OVERSCAN)
     const visible = Math.ceil(el.clientHeight / ROW_HEIGHT) + OVERSCAN * 2
     setRange({ start, end: start + visible })
+  }, [])
 
-    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < ROW_HEIGHT * 20
-    if (nearBottom && hasMore && !loading) onLoadMore()
-  }, [hasMore, loading, onLoadMore])
-
-  useLayoutEffect(recompute, [recompute, events.length])
+  useLayoutEffect(() => {
+    viewport.current?.scrollTo({ top: 0 })
+    recompute()
+  }, [recompute, events])
 
   if (events.length === 0 && !loading) {
     return (
       <div className="table-wrap">
         <div className="table-inner">
-          <Header defs={defs} template={template} />
+          <Header defs={defs} template={template} widths={widths} onResize={onResize} />
         </div>
         <p className="empty">
           <strong>No traffic matches this filter</strong>
@@ -69,7 +70,7 @@ export function TrafficTable({
   return (
     <div className="table-wrap" ref={viewport} onScroll={recompute}>
       <div className="table-inner">
-        <Header defs={defs} template={template} />
+        <Header defs={defs} template={template} widths={widths} onResize={onResize} />
         <div style={{ height: range.start * ROW_HEIGHT }} />
         {slice.map((e) => (
           <Row
@@ -88,16 +89,77 @@ export function TrafficTable({
   )
 }
 
-function Header({ defs, template }: { defs: ColumnDef[]; template: string }) {
+function Header({
+  defs,
+  template,
+  widths,
+  onResize,
+}: {
+  defs: ColumnDef[]
+  template: string
+  widths: Record<string, number>
+  onResize: (id: string, width: number) => void
+}) {
   return (
     <div className="thead" style={{ gridTemplateColumns: template }}>
       <div />
       {defs.map((c) => (
         <div key={c.id} className={c.align === 'right' ? 'cell-num' : undefined}>
-          {c.label}
+          <span className="th-label">{c.label}</span>
+          <ResizeHandle id={c.id} widths={widths} onResize={onResize} />
         </div>
       ))}
     </div>
+  )
+}
+
+/** ResizeHandle drags a column to a fixed pixel width. */
+function ResizeHandle({
+  id,
+  widths,
+  onResize,
+}: {
+  id: string
+  widths: Record<string, number>
+  onResize: (id: string, width: number) => void
+}) {
+  function start(e: React.PointerEvent<HTMLSpanElement>) {
+    e.preventDefault()
+    e.stopPropagation()
+
+    // The starting width is whatever the column is rendering at right now, so a
+    // flexible column becomes fixed at its current size rather than jumping.
+    const cell = e.currentTarget.parentElement as HTMLElement
+    const startWidth = widths[id] ?? cell.getBoundingClientRect().width
+    const startX = e.clientX
+
+    function move(ev: PointerEvent) {
+      onResize(id, Math.max(MIN_WIDTH, Math.round(startWidth + ev.clientX - startX)))
+    }
+    function done() {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', done)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', done)
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+  }
+
+  return (
+    <span
+      className="th-resize"
+      onPointerDown={start}
+      onDoubleClick={(e) => {
+        e.stopPropagation()
+        onResize(id, 0) // back to the column's natural width
+      }}
+      role="separator"
+      aria-label="Resize column"
+      title="Drag to resize, double-click to reset"
+    />
   )
 }
 

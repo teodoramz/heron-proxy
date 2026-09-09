@@ -32,6 +32,18 @@ type stack struct {
 	reader   *reader.Reader
 	pipeline *pipeline.Pipeline
 	appID    string
+
+	router *router.Router
+	waf    *waf.Engine
+	app    config.App
+}
+
+// reconfigure installs new WAF rules for the app, the way the proxy's config
+// loader does when an exclusion is added in the UI.
+func (s *stack) reconfigure(extraRules []string) {
+	s.app.WAF.ExtraRules = extraRules
+	s.router.Replace([]config.App{s.app})
+	s.waf.Reload()
 }
 
 // newStack wires the real proxy to a real ClickHouse through the real pipeline.
@@ -67,8 +79,7 @@ func newStackWithUpstream(t *testing.T, handler http.Handler) *stack {
 	upstream := httptest.NewServer(handler)
 	t.Cleanup(upstream.Close)
 
-	rt := router.New()
-	rt.Replace([]config.App{{
+	app := config.App{
 		ID:          appID,
 		Name:        appID,
 		Hostnames:   []string{"app.test"},
@@ -77,7 +88,9 @@ func newStackWithUpstream(t *testing.T, handler http.Handler) *stack {
 		Capture:     config.DefaultCapture(),
 		Redaction:   config.DefaultRedaction(),
 		WAF:         config.DefaultWAF(),
-	}})
+	}
+	rt := router.New()
+	rt.Replace([]config.App{app})
 
 	sp, err := spool.Open(t.TempDir(), spool.Options{SegmentBytes: 8 << 20, MaxBytes: 64 << 20})
 	if err != nil {
@@ -89,15 +102,19 @@ func newStackWithUpstream(t *testing.T, handler http.Handler) *stack {
 	pipe.Start(ctx)
 	t.Cleanup(func() { pipe.Close() })
 
+	engine := waf.NewEngine(t.TempDir())
 	srv := httptest.NewServer(proxy.New(proxy.Options{
 		Router: rt,
-		WAF:    waf.NewEngine(t.TempDir()),
+		WAF:    engine,
 		Sink:   pipe,
 		Blobs:  blob.New(t.TempDir()),
 	}))
 	t.Cleanup(srv.Close)
 
-	return &stack{proxy: srv, upstream: upstream, reader: reader.New(ch.Conn()), pipeline: pipe, appID: appID}
+	return &stack{
+		proxy: srv, upstream: upstream, reader: reader.New(ch.Conn()), pipeline: pipe,
+		appID: appID, router: rt, waf: engine, app: app,
+	}
 }
 
 type chSink struct{ w *chsink.Writer }

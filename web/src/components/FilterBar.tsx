@@ -9,7 +9,6 @@ interface Props {
   live: boolean
   liveConnected: boolean
   onToggleLive: () => void
-  total?: { count: number; capped: boolean }
   columns: string[]
   onColumnsChange: (ids: string[]) => void
   autoRefresh: boolean
@@ -34,7 +33,6 @@ export function FilterBar({
   live,
   liveConnected,
   onToggleLive,
-  total,
   columns,
   onColumnsChange,
   autoRefresh,
@@ -191,7 +189,7 @@ export function FilterBar({
         <ColumnPicker selected={columns} onChange={onColumnsChange} />
       </form>
 
-      {(conditions.length > 0 || total || lastLoaded) && (
+      {(conditions.length > 0 || lastLoaded) && (
         <div className="filter-row">
           {conditions.map((c, i) => (
             <span className="chip" key={`${c.field}-${i}`}>
@@ -204,11 +202,6 @@ export function FilterBar({
             </span>
           ))}
           <span className="spacer" />
-          {total && (
-            <span className="muted mono">
-              {total.capped ? `${total.count.toLocaleString()}+` : total.count.toLocaleString()} requests
-            </span>
-          )}
           {lastLoaded && (
             <span className="muted mono" title="When the table last reloaded">
               updated {lastLoaded.toLocaleTimeString('en-GB', { hour12: false })}
