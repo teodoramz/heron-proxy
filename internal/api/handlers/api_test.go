@@ -686,3 +686,84 @@ func TestHealthz(t *testing.T) {
 		t.Errorf("status = %d", resp.StatusCode)
 	}
 }
+
+// TestNewAppGetsWorkingDefaults guards the failure mode where omitted JSON
+// fields become Go zero values, leaving a new app recording nothing.
+func TestNewAppGetsWorkingDefaults(t *testing.T) {
+	h := newHarness(t)
+	c := h.login(t, "admin@example.test", store.RoleAdmin, nil)
+
+	c.decode(c.do(http.MethodPost, "/api/apps", map[string]any{
+		"id": "minimal", "hostnames": []string{"minimal.example"},
+		"upstream_url": "http://127.0.0.1:9",
+	}), http.StatusOK, nil)
+
+	var got struct {
+		Enabled bool `json:"enabled"`
+		Capture struct {
+			Enabled bool `json:"enabled"`
+		} `json:"capture"`
+		Redaction struct {
+			Enabled bool `json:"enabled"`
+		} `json:"redaction"`
+		WAF struct {
+			Enabled       bool `json:"enabled"`
+			ParanoiaLevel int  `json:"paranoia_level"`
+			Threshold     int  `json:"threshold"`
+		} `json:"waf"`
+	}
+	c.decode(c.get("/api/apps/minimal"), http.StatusOK, &got)
+
+	if !got.Enabled {
+		t.Error("a new app is not enabled")
+	}
+	if !got.Capture.Enabled {
+		t.Error("capture is off on a new app; nothing would be recorded")
+	}
+	if !got.Redaction.Enabled {
+		t.Error("redaction is off on a new app; credentials would be stored in the clear")
+	}
+	if !got.WAF.Enabled || got.WAF.ParanoiaLevel != 1 || got.WAF.Threshold != 5 {
+		t.Errorf("waf defaults wrong: %+v", got.WAF)
+	}
+}
+
+// TestUpdateDoesNotResetOmittedFields checks the upsert merges rather than
+// replaces, so a partial update cannot silently disable an app.
+func TestUpdateDoesNotResetOmittedFields(t *testing.T) {
+	h := newHarness(t)
+	c := h.login(t, "admin@example.test", store.RoleAdmin, nil)
+
+	c.decode(c.do(http.MethodPost, "/api/apps", map[string]any{
+		"id": "merge", "hostnames": []string{"merge.example"},
+		"upstream_url": "http://127.0.0.1:9",
+		"waf":          map[string]any{"enabled": true, "paranoia_level": 3, "threshold": 9},
+	}), http.StatusOK, nil)
+
+	// Rename only; every other field must survive.
+	c.decode(c.do(http.MethodPut, "/api/apps/merge", map[string]any{"name": "Renamed"}), http.StatusOK, nil)
+
+	var got struct {
+		Name    string   `json:"name"`
+		Enabled bool     `json:"enabled"`
+		Hosts   []string `json:"hostnames"`
+		WAF     struct {
+			ParanoiaLevel int `json:"paranoia_level"`
+			Threshold     int `json:"threshold"`
+		} `json:"waf"`
+	}
+	c.decode(c.get("/api/apps/merge"), http.StatusOK, &got)
+
+	if got.Name != "Renamed" {
+		t.Errorf("name = %q", got.Name)
+	}
+	if !got.Enabled {
+		t.Error("a partial update disabled the app")
+	}
+	if len(got.Hosts) != 1 || got.Hosts[0] != "merge.example" {
+		t.Errorf("hostnames lost: %v", got.Hosts)
+	}
+	if got.WAF.ParanoiaLevel != 3 || got.WAF.Threshold != 9 {
+		t.Errorf("waf policy reset by a partial update: %+v", got.WAF)
+	}
+}

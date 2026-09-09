@@ -47,8 +47,24 @@ func (h *Handler) GetApp(w http.ResponseWriter, r *http.Request) {
 }
 
 // SaveApp creates or updates an app.
+//
+// The request body is decoded over a base rather than a zero value: an existing
+// app when updating, the defaults when creating. Without this, any field the
+// caller omits would be silently set to Go's zero value, so a new app would
+// arrive with capture and the WAF switched off.
 func (h *Handler) SaveApp(w http.ResponseWriter, r *http.Request) {
-	var app config.App
+	app := config.App{
+		Enabled:           true,
+		UpstreamTLSVerify: true,
+		Capture:           config.DefaultCapture(),
+		Redaction:         config.DefaultRedaction(),
+		WAF:               config.DefaultWAF(),
+	}
+	if id := r.PathValue("id"); id != "" {
+		if existing, err := h.Store.GetApp(r.Context(), id); err == nil {
+			app = existing
+		}
+	}
 	if err := decodeBody(r, &app); err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
