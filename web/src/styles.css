@@ -238,7 +238,28 @@ a:hover { text-decoration: underline; }
 
 /* ---------- traffic table ---------- */
 
-.table-wrap { flex: 1; min-height: 0; overflow: auto; position: relative; }
+.table-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  position: relative;
+  /* Keep the horizontal bar visible rather than letting the platform hide it:
+     when the table is wider than the window, that bar is the only sign. */
+  scrollbar-color: var(--line-strong) transparent;
+  scrollbar-width: auto;
+}
+
+.table-wrap::-webkit-scrollbar { width: 14px; height: 14px; }
+.table-wrap::-webkit-scrollbar-track { background: var(--bg); }
+
+.table-wrap::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border: 3px solid var(--bg);
+  border-radius: 8px;
+}
+
+.table-wrap::-webkit-scrollbar-thumb:hover { background: var(--text-faint); }
+.table-wrap::-webkit-scrollbar-corner { background: var(--bg); }
 
 /* Sized to the sum of the column minimums. When that fits, the fr tracks share
    the spare width; when it does not, the table scrolls sideways rather than
@@ -276,6 +297,11 @@ a:hover { text-decoration: underline; }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Values are meant to be read and copied, so selection stays enabled. The row
+   keeps its pointer cursor: clicking still opens the detail, unless the click
+   ended a text selection. */
+.trow > div { user-select: text; }
 
 .thead > div { padding-top: 6px; padding-bottom: 6px; }
 
@@ -629,10 +655,6 @@ table.data td.num { text-align: right; }
 .th-resize:hover::after { background: var(--accent); width: 2px; }
 
 /* ---------- pager ---------- */
-
-/* Press and drag the table to pan it sideways. */
-.pannable { cursor: grab; }
-.pannable:active { cursor: grabbing; }
 
 .pager {
   display: flex;

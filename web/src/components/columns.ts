@@ -177,7 +177,7 @@ export function trackFor(c: ColumnDef, widths: Record<string, number>, mode: Wid
 const MODE_KEY = 'pw-width-mode'
 
 export function loadWidthMode(): WidthMode {
-  return localStorage.getItem(MODE_KEY) === 'full' ? 'full' : 'fit'
+  return localStorage.getItem(MODE_KEY) === 'fit' ? 'fit' : 'full'
 }
 
 export function saveWidthMode(mode: WidthMode): void {

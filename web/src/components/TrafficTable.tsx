@@ -18,8 +18,7 @@ interface Props {
   onSelect: (e: TrafficEvent) => void
 }
 
-/** Movement beyond this many pixels counts as a drag rather than a click. */
-const DRAG_SLOP = 5
+
 
 /**
  * TrafficTable renders only the rows in view, so a large page stays responsive.
@@ -38,55 +37,49 @@ export function TrafficTable({
 }: Props) {
   const viewport = useRef<HTMLDivElement>(null)
   const [range, setRange] = useState({ start: 0, end: 60 })
-  const dragged = useRef(false)
 
   const defs = columns.map((id) => COLUMNS_BY_ID.get(id)).filter(Boolean) as ColumnDef[]
   // The leading 4px track is the anomaly gutter.
   const template = `4px ${defs.map((c) => trackFor(c, widths, widthMode)).join(' ')}`
 
-  // Press and drag anywhere on the table to pan sideways, so a wide row can be
-  // read without reaching for the scrollbar. A press that does not move is
-  // still a click, and opens the row.
+  // Panning is on the middle button only. The left button has to stay free for
+  // selecting text inside a cell, which is the whole point of showing it.
   const startPan = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     const el = viewport.current
-    if (!el || e.button !== 0) return
-    if ((e.target as HTMLElement).classList.contains('th-resize')) return
+    if (!el || e.button !== 1) return
+    e.preventDefault()
 
     const startX = e.clientX
     const startY = e.clientY
     const startLeft = el.scrollLeft
     const startTop = el.scrollTop
-    dragged.current = false
 
     function move(ev: PointerEvent) {
-      const dx = ev.clientX - startX
-      const dy = ev.clientY - startY
-      if (!dragged.current && Math.abs(dx) + Math.abs(dy) < DRAG_SLOP) return
-      dragged.current = true
-      el!.scrollLeft = startLeft - dx
-      el!.scrollTop = startTop - dy
-      document.body.style.cursor = 'grabbing'
-      document.body.style.userSelect = 'none'
+      el!.scrollLeft = startLeft - (ev.clientX - startX)
+      el!.scrollTop = startTop - (ev.clientY - startY)
     }
     function done() {
       window.removeEventListener('pointermove', move)
       window.removeEventListener('pointerup', done)
       document.body.style.cursor = ''
-      document.body.style.userSelect = ''
     }
     window.addEventListener('pointermove', move)
     window.addEventListener('pointerup', done)
+    document.body.style.cursor = 'grabbing'
   }, [])
 
-  // A wheel with shift held scrolls sideways, which is the other way people expect.
+  // Shift with the wheel scrolls sideways, the way people expect in a wide table.
   const onWheel = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
     if (!e.shiftKey || !viewport.current) return
     viewport.current.scrollLeft += e.deltaY
   }, [])
 
+  // Opening a row must not fight selecting text in it: a click that ends a
+  // selection is the person copying a value, not asking for the detail.
   const select = useCallback(
     (e: TrafficEvent) => {
-      if (dragged.current) return // the pointer was panning, not choosing a row
+      const selection = window.getSelection()
+      if (selection && !selection.isCollapsed && selection.toString().trim() !== '') return
       onSelect(e)
     },
     [onSelect],
@@ -123,7 +116,7 @@ export function TrafficTable({
 
   return (
     <div
-      className="table-wrap pannable"
+      className="table-wrap"
       ref={viewport}
       onScroll={recompute}
       onPointerDown={startPan}
