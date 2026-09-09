@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/amzteodor/proxy-waf/internal/store"
+	"github.com/amzteodor/heron/internal/store"
 )
 
 type fakeUsers struct {
@@ -182,9 +182,9 @@ func TestRequireRole(t *testing.T) {
 		want int
 	}{
 		{store.RoleAdmin, store.RoleAdmin, http.StatusOK},
+		{store.RoleAdmin, store.RoleAnalyst, http.StatusOK},
+		{store.RoleAnalyst, store.RoleAnalyst, http.StatusOK},
 		{store.RoleAnalyst, store.RoleAdmin, http.StatusForbidden},
-		{store.RoleAnalyst, store.RoleViewer, http.StatusOK},
-		{store.RoleViewer, store.RoleAnalyst, http.StatusForbidden},
 	}
 	for _, c := range cases {
 		users := &fakeUsers{users: map[string]store.User{"u1": {ID: "u1", Role: c.have, Enabled: true}}}
@@ -203,7 +203,7 @@ func TestRequireRole(t *testing.T) {
 
 func TestRequireRoleWithoutSession(t *testing.T) {
 	rec := httptest.NewRecorder()
-	RequireRole(store.RoleViewer)(okHandler()).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+	RequireRole(store.RoleAnalyst)(okHandler()).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
 	if rec.Code != http.StatusUnauthorized {
 		t.Errorf("status = %d, want 401", rec.Code)
 	}

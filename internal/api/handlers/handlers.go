@@ -10,12 +10,12 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/amzteodor/proxy-waf/internal/api/auth"
-	"github.com/amzteodor/proxy-waf/internal/api/query"
-	"github.com/amzteodor/proxy-waf/internal/api/reader"
-	"github.com/amzteodor/proxy-waf/internal/api/tail"
-	"github.com/amzteodor/proxy-waf/internal/pipeline/blob"
-	"github.com/amzteodor/proxy-waf/internal/store"
+	"github.com/amzteodor/heron/internal/api/auth"
+	"github.com/amzteodor/heron/internal/api/query"
+	"github.com/amzteodor/heron/internal/api/reader"
+	"github.com/amzteodor/heron/internal/api/tail"
+	"github.com/amzteodor/heron/internal/pipeline/blob"
+	"github.com/amzteodor/heron/internal/store"
 )
 
 // maxBodyBytes bounds a request body the API will parse.

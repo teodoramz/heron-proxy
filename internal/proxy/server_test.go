@@ -12,11 +12,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/amzteodor/proxy-waf/internal/config"
-	"github.com/amzteodor/proxy-waf/internal/pipeline/blob"
-	"github.com/amzteodor/proxy-waf/internal/pipeline/event"
-	"github.com/amzteodor/proxy-waf/internal/proxy/router"
-	"github.com/amzteodor/proxy-waf/internal/proxy/waf"
+	"github.com/amzteodor/heron/internal/config"
+	"github.com/amzteodor/heron/internal/pipeline/blob"
+	"github.com/amzteodor/heron/internal/pipeline/event"
+	"github.com/amzteodor/heron/internal/proxy/router"
+	"github.com/amzteodor/heron/internal/proxy/waf"
 )
 
 type captureSink struct {
@@ -647,5 +647,112 @@ func TestTLSTerminationIsIndependentOfTheUpstream(t *testing.T) {
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("the upstream was never reached")
+	}
+}
+
+// TestBlockingModeRejectsAtTheThreshold is the whole point of enforcing: the
+// request never reaches the application, and the event records that it was
+// stopped rather than merely flagged.
+func TestBlockingModeRejectsAtTheThreshold(t *testing.T) {
+	reached := make(chan struct{}, 1)
+	h := newHarness(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		reached <- struct{}{}
+		w.WriteHeader(http.StatusOK)
+	}), func(a *config.App) {
+		a.WAF = config.DefaultWAF()
+		a.WAF.Mode = config.ModeBlock
+	})
+
+	resp := h.get(t, "/search?id=1%27%20OR%20%271%27%3D%271%20--%20")
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("status = %d, want 403", resp.StatusCode)
+	}
+	if !strings.Contains(string(body), "Reference:") {
+		t.Errorf("the rejection does not quote a reference: %q", body)
+	}
+	if resp.Header.Get("X-Request-Id") == "" {
+		t.Error("no request id on the rejection")
+	}
+	select {
+	case <-reached:
+		t.Error("the application received a request that should have been rejected")
+	case <-time.After(200 * time.Millisecond):
+	}
+
+	e := h.sink.wait(t)
+	if !e.Blocked {
+		t.Error("the event does not record that it was blocked")
+	}
+	if !e.WouldBlock {
+		t.Error("WouldBlock should also hold: the score crossed the threshold")
+	}
+	if e.Status != http.StatusForbidden {
+		t.Errorf("recorded status = %d", e.Status)
+	}
+}
+
+func TestBlockingModeLetsCleanTrafficThrough(t *testing.T) {
+	h := newHarness(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, "reached the application")
+	}), func(a *config.App) {
+		a.WAF = config.DefaultWAF()
+		a.WAF.Mode = config.ModeBlock
+	})
+
+	resp := h.get(t, "/index.html")
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+
+	if resp.StatusCode != http.StatusOK || string(body) != "reached the application" {
+		t.Errorf("clean traffic was disturbed: status=%d body=%q", resp.StatusCode, body)
+	}
+	if e := h.sink.wait(t); e.Blocked {
+		t.Error("a clean request was recorded as blocked")
+	}
+}
+
+// TestDetectModeNeverBlocks guards the default: the same payload that is
+// rejected under enforcement must still be forwarded when only detecting.
+func TestDetectModeNeverBlocks(t *testing.T) {
+	h := newHarness(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, "reached the application")
+	}), func(a *config.App) { a.WAF = config.DefaultWAF() })
+
+	resp := h.get(t, "/search?id=1%27%20OR%20%271%27%3D%271%20--%20")
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+
+	if resp.StatusCode != http.StatusOK || string(body) != "reached the application" {
+		t.Errorf("detection mode blocked: status=%d body=%q", resp.StatusCode, body)
+	}
+	e := h.sink.wait(t)
+	if e.Blocked {
+		t.Error("detection mode recorded a block")
+	}
+	if !e.WouldBlock {
+		t.Error("detection mode should still flag it as would-block")
+	}
+}
+
+func TestBlockingRaisesTheThresholdCorrectly(t *testing.T) {
+	// At a threshold nothing reaches, blocking mode must forward everything.
+	h := newHarness(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, "reached the application")
+	}), func(a *config.App) {
+		a.WAF = config.DefaultWAF()
+		a.WAF.Mode = config.ModeBlock
+		a.WAF.Threshold = 1000
+	})
+
+	resp := h.get(t, "/search?id=1%27%20OR%20%271%27%3D%271%20--%20")
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("status = %d; a threshold of 1000 should reject nothing", resp.StatusCode)
+	}
+	if e := h.sink.wait(t); e.Blocked {
+		t.Error("blocked below the threshold")
 	}
 }

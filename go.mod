@@ -1,4 +1,4 @@
-module github.com/amzteodor/proxy-waf
+module github.com/amzteodor/heron
 
 go 1.26.2
 

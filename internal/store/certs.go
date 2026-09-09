@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/amzteodor/proxy-waf/internal/proxy/tlsx"
+	"github.com/amzteodor/heron/internal/proxy/tlsx"
 )
 
 // Certificate is a stored TLS certificate. PrivateKeyPEM is only populated when

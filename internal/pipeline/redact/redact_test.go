@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/amzteodor/proxy-waf/internal/config"
-	"github.com/amzteodor/proxy-waf/internal/pipeline/event"
+	"github.com/amzteodor/heron/internal/config"
+	"github.com/amzteodor/heron/internal/pipeline/event"
 )
 
 func newTestRedactor() *Redactor { return New(config.DefaultRedaction()) }

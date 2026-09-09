@@ -13,17 +13,20 @@ import (
 // Role names the permission level of a user.
 type Role string
 
-// The three roles, in descending order of privilege.
+// The two roles, in descending order of privilege.
+//
+// Analyst is everyone who reads traffic: browsing it, seeing request bodies,
+// replaying a request and recording a verdict are all the same job. Admin adds
+// the configuration everyone else depends on.
 const (
 	RoleAdmin   Role = "admin"
 	RoleAnalyst Role = "analyst"
-	RoleViewer  Role = "viewer"
 )
 
 // Valid reports whether r is a known role.
 func (r Role) Valid() bool {
 	switch r {
-	case RoleAdmin, RoleAnalyst, RoleViewer:
+	case RoleAdmin, RoleAnalyst:
 		return true
 	}
 	return false
@@ -31,7 +34,7 @@ func (r Role) Valid() bool {
 
 // AtLeast reports whether r is at least as privileged as want.
 func (r Role) AtLeast(want Role) bool {
-	rank := map[Role]int{RoleViewer: 1, RoleAnalyst: 2, RoleAdmin: 3}
+	rank := map[Role]int{RoleAnalyst: 1, RoleAdmin: 2}
 	return rank[r] >= rank[want]
 }
 

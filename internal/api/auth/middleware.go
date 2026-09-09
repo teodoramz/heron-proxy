@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/amzteodor/proxy-waf/internal/store"
+	"github.com/amzteodor/heron/internal/store"
 )
 
 // Cookie names.

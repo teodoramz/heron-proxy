@@ -7,9 +7,9 @@ COPY . .
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/proxy ./cmd/proxy
 
 FROM alpine:3.21
-RUN apk add --no-cache ca-certificates tzdata && adduser -D -u 10001 proxy
+RUN apk add --no-cache ca-certificates tzdata && adduser -D -u 10001 heron
 COPY --from=build /out/proxy /usr/local/bin/proxy
-RUN mkdir -p /data/spool /data/blobs /rules && chown -R proxy:proxy /data /rules
-USER proxy
+RUN mkdir -p /data/spool /data/blobs /rules && chown -R heron:heron /data /rules
+USER heron
 EXPOSE 80 443 9090
 ENTRYPOINT ["/usr/local/bin/proxy"]

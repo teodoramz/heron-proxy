@@ -9,7 +9,7 @@ import (
 	"net"
 	"sync"
 
-	"github.com/amzteodor/proxy-waf/internal/proxy/ja3"
+	"github.com/amzteodor/heron/internal/proxy/ja3"
 )
 
 const maxHelloRecord = 5 + 65536

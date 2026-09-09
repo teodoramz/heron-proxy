@@ -10,8 +10,7 @@ import (
 
 	"github.com/gorilla/websocket"
 
-	"github.com/amzteodor/proxy-waf/internal/api/query"
-	"github.com/amzteodor/proxy-waf/internal/store"
+	"github.com/amzteodor/heron/internal/api/query"
 )
 
 // upgrader authorizes the handshake by Origin. This is the only cross-site
@@ -116,9 +115,6 @@ func (h *Handler) Stream(w http.ResponseWriter, r *http.Request) {
 			}
 			if !s.CanSeeApp(e.AppID) || !matcher.Match(&e) {
 				continue
-			}
-			if !s.User.Role.AtLeast(store.RoleAnalyst) {
-				e.ReqBody = ""
 			}
 			if err := conn.WriteJSON(e); err != nil {
 				return

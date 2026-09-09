@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/amzteodor/proxy-waf/internal/config"
-	"github.com/amzteodor/proxy-waf/internal/pipeline/event"
+	"github.com/amzteodor/heron/internal/config"
+	"github.com/amzteodor/heron/internal/pipeline/event"
 )
 
 // Redactor applies one app's redaction policy.

@@ -7,9 +7,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/amzteodor/proxy-waf/internal/api/reader"
-	"github.com/amzteodor/proxy-waf/internal/pipeline/event"
-	"github.com/amzteodor/proxy-waf/internal/store"
+	"github.com/amzteodor/heron/internal/api/reader"
+	"github.com/amzteodor/heron/internal/pipeline/event"
+	"github.com/amzteodor/heron/internal/store"
 )
 
 // ListTraffic returns one keyset page of events.
@@ -23,12 +23,6 @@ func (h *Handler) ListTraffic(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
-	}
-	if !session(r).User.Role.AtLeast(store.RoleAnalyst) {
-		for i := range page.Events {
-			page.Events[i].ReqBody = ""
-			page.Events[i].ReqBodyPreview = ""
-		}
 	}
 	writeJSON(w, http.StatusOK, page)
 }
@@ -91,12 +85,7 @@ func (h *Handler) GetTraffic(w http.ResponseWriter, r *http.Request) {
 		detail.MatchedRule = append(detail.MatchedRule, m)
 	}
 
-	if s.User.Role.AtLeast(store.RoleAnalyst) {
-		detail.Body, detail.BodySource = h.loadBody(e)
-	} else {
-		detail.Event.ReqBody = ""
-		detail.Event.ReqBodyPreview = ""
-	}
+	detail.Body, detail.BodySource = h.loadBody(e)
 
 	if marks, err := h.Store.FPMarksForEvents(r.Context(), []string{id}); err == nil {
 		detail.FPMarks = marks[id]

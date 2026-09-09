@@ -4,7 +4,7 @@ import (
 	"net/netip"
 	"testing"
 
-	"github.com/amzteodor/proxy-waf/internal/pipeline/event"
+	"github.com/amzteodor/heron/internal/pipeline/event"
 )
 
 func sampleEvent() *event.Event {

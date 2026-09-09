@@ -7,11 +7,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/amzteodor/proxy-waf/internal/config"
-	"github.com/amzteodor/proxy-waf/internal/proxy/router"
-	"github.com/amzteodor/proxy-waf/internal/proxy/tlsx"
-	"github.com/amzteodor/proxy-waf/internal/proxy/waf"
-	"github.com/amzteodor/proxy-waf/internal/store"
+	"github.com/amzteodor/heron/internal/config"
+	"github.com/amzteodor/heron/internal/proxy/router"
+	"github.com/amzteodor/heron/internal/proxy/tlsx"
+	"github.com/amzteodor/heron/internal/proxy/waf"
+	"github.com/amzteodor/heron/internal/store"
 )
 
 // ConfigSource supplies the proxy's live configuration.
@@ -69,7 +69,7 @@ func (l *Loader) Load(ctx context.Context) error {
 	// The authority signs for hosts with no uploaded certificate, so a new
 	// application works before anyone prepares one.
 	if l.certs.CA() == nil {
-		ca, err := l.src.EnsureCA(ctx, "proxy-waf")
+		ca, err := l.src.EnsureCA(ctx, "heron")
 		if err != nil {
 			l.log.Warn("certificate authority unavailable; hosts without an uploaded certificate will fail", "err", err)
 		} else {

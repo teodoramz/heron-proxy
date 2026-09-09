@@ -67,10 +67,14 @@ A workable sequence:
 | 3 | Aggressive. Expect to exclude regularly. |
 | 4 | Very aggressive. Appropriate only for narrow, well-understood applications. |
 
-## Enabling blocking
+## Enforcing
 
-This tool does not block, by design. When the simulator shows a threshold you
-trust, take that configuration — paranoia level, threshold, and your exclusions —
-to something built to enforce: ModSecurity in front of your app, a Coraza-based
-gateway, or your CDN's WAF. The exclusions this tool generates are standard
-SecLang and transfer as they are.
+Set the application's mode to **Reject** on the Applications page. Requests
+whose score reaches the threshold get a 403 quoting a reference you can search
+for; everything else is forwarded untouched.
+
+The rule engine stays in detection mode either way. The decision is taken from
+the same anomaly score the simulator reports, so enforcing does what the
+simulation said it would.
+
+Mode is per application, so one can enforce while another still only records.

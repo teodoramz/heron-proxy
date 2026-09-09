@@ -1,4 +1,4 @@
-name: proxy-waf
+name: heron
 
 services:
   proxy:

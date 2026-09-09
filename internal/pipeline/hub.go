@@ -3,7 +3,7 @@ package pipeline
 import (
 	"sync"
 
-	"github.com/amzteodor/proxy-waf/internal/pipeline/event"
+	"github.com/amzteodor/heron/internal/pipeline/event"
 )
 
 // hub fans events out to live-tail subscribers.

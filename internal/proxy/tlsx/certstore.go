@@ -91,13 +91,8 @@ func (s *CertStore) GetCertificate(chi *tls.ClientHelloInfo) (*tls.Certificate, 
 			return c, nil
 		}
 	}
-	// Mint one rather than failing the handshake. A client that trusts the
-	// authority sees a valid certificate; one that does not sees a warning,
-	// which is the honest result of intercepting the connection.
-	//
-	// This comes before the explicit catch-all deliberately: a certificate
-	// carrying the name that was asked for is better than a valid certificate
-	// for some other name.
+	// Before the catch-all deliberately: a certificate carrying the name that
+	// was asked for beats a valid certificate for some other name.
 	if ca := s.ca.Load(); ca != nil && name != "" {
 		if leaf, err := ca.Leaf(name); err == nil {
 			return leaf, nil

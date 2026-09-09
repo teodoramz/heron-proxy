@@ -77,6 +77,11 @@ export function Dashboard() {
             value={summary ? count(summary.would_block) : '—'}
             tone={summary && summary.would_block > 0 ? 'block' : undefined}
           />
+          <Stat
+            label="Rejected"
+            value={summary ? count(summary.blocked) : '—'}
+            tone={summary && summary.blocked > 0 ? 'blocked' : undefined}
+          />
           <Stat label="4xx and 5xx" value={summary ? count(summary.errors) : '—'} />
           <Stat label="p95 latency" value={summary ? duration(Math.round(summary.p95_duration_ms)) : '—'} />
           <Stat label="p99 latency" value={summary ? duration(Math.round(summary.p99_duration_ms)) : '—'} />
@@ -137,11 +142,12 @@ export function Dashboard() {
   )
 }
 
-function Stat({ label, value, tone }: { label: string; value: string; tone?: 'block' }) {
+function Stat({ label, value, tone }: { label: string; value: string; tone?: 'block' | 'blocked' }) {
+  const cls = tone === 'blocked' ? 'blocked-flag' : tone === 'block' ? 'block-flag' : ''
   return (
     <div className="stat">
       <dt>{label}</dt>
-      <dd className={tone === 'block' ? 'block-flag' : ''}>{value}</dd>
+      <dd className={cls}>{value}</dd>
     </div>
   )
 }

@@ -8,7 +8,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/amzteodor/proxy-waf/internal/proxy/tlsx"
+	"github.com/amzteodor/heron/internal/proxy/tlsx"
 )
 
 // CAInfo describes the proxy's certificate authority without exposing its key.

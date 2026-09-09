@@ -14,16 +14,16 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/amzteodor/proxy-waf/internal/api"
-	"github.com/amzteodor/proxy-waf/internal/api/alerts"
-	"github.com/amzteodor/proxy-waf/internal/api/auth"
-	"github.com/amzteodor/proxy-waf/internal/api/handlers"
-	"github.com/amzteodor/proxy-waf/internal/api/reader"
-	"github.com/amzteodor/proxy-waf/internal/api/tail"
-	"github.com/amzteodor/proxy-waf/internal/config"
-	"github.com/amzteodor/proxy-waf/internal/pipeline/blob"
-	"github.com/amzteodor/proxy-waf/internal/pipeline/chsink"
-	"github.com/amzteodor/proxy-waf/internal/store"
+	"github.com/amzteodor/heron/internal/api"
+	"github.com/amzteodor/heron/internal/api/alerts"
+	"github.com/amzteodor/heron/internal/api/auth"
+	"github.com/amzteodor/heron/internal/api/handlers"
+	"github.com/amzteodor/heron/internal/api/reader"
+	"github.com/amzteodor/heron/internal/api/tail"
+	"github.com/amzteodor/heron/internal/config"
+	"github.com/amzteodor/heron/internal/pipeline/blob"
+	"github.com/amzteodor/heron/internal/pipeline/chsink"
+	"github.com/amzteodor/heron/internal/store"
 )
 
 func main() {

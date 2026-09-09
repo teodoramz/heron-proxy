@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/amzteodor/proxy-waf/internal/pipeline/event"
-	"github.com/amzteodor/proxy-waf/internal/pipeline/spool"
+	"github.com/amzteodor/heron/internal/pipeline/event"
+	"github.com/amzteodor/heron/internal/pipeline/spool"
 )
 
 const (

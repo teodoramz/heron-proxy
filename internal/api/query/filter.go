@@ -88,6 +88,7 @@ var columns = map[string]column{
 	"rule_severity":     {"rule_severity", kUInt},
 	"paranoia_max":      {"paranoia_max", kUInt},
 	"would_block":       {"would_block", kBool},
+	"blocked":           {"blocked", kBool},
 	"upstream":          {"upstream", kString},
 	"error":             {"error", kString},
 	"is_websocket":      {"is_websocket", kBool},

@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/amzteodor/proxy-waf/internal/api/rules"
+	"github.com/amzteodor/heron/internal/api/rules"
 )
 
 // ListRules searches the Core Rule Set catalogue, so an analyst can look up what

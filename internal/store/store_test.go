@@ -17,7 +17,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/amzteodor/proxy-waf/internal/config"
+	"github.com/amzteodor/heron/internal/config"
 )
 
 var testKey = []byte("0123456789abcdef0123456789abcdef")
@@ -274,11 +274,11 @@ func TestUserLifecycle(t *testing.T) {
 	if got.ID != u.ID || got.Role != RoleAdmin || !got.Enabled {
 		t.Errorf("user mismatch: %+v", got)
 	}
-	if err := s.UpdateUser(ctx, u.ID, RoleViewer, false); err != nil {
+	if err := s.UpdateUser(ctx, u.ID, RoleAnalyst, false); err != nil {
 		t.Fatalf("UpdateUser: %v", err)
 	}
 	got, _ = s.GetUser(ctx, u.ID)
-	if got.Role != RoleViewer || got.Enabled {
+	if got.Role != RoleAnalyst || got.Enabled {
 		t.Errorf("update not applied: %+v", got)
 	}
 	if err := s.SetPassword(ctx, u.ID, "newhash"); err != nil {
@@ -304,11 +304,27 @@ func TestCreateUserRejectsBadRole(t *testing.T) {
 }
 
 func TestRoleAtLeast(t *testing.T) {
-	if !RoleAdmin.AtLeast(RoleAnalyst) || !RoleAnalyst.AtLeast(RoleViewer) {
-		t.Error("privilege ordering wrong")
+	if !RoleAdmin.AtLeast(RoleAnalyst) || !RoleAdmin.AtLeast(RoleAdmin) {
+		t.Error("an admin should satisfy every role")
 	}
-	if RoleViewer.AtLeast(RoleAnalyst) {
-		t.Error("viewer must not satisfy analyst")
+	if !RoleAnalyst.AtLeast(RoleAnalyst) {
+		t.Error("a role should satisfy itself")
+	}
+	if RoleAnalyst.AtLeast(RoleAdmin) {
+		t.Error("an analyst must not satisfy admin")
+	}
+}
+
+func TestOnlyTwoRolesAreValid(t *testing.T) {
+	for _, r := range []Role{RoleAdmin, RoleAnalyst} {
+		if !r.Valid() {
+			t.Errorf("%q should be valid", r)
+		}
+	}
+	for _, r := range []Role{"viewer", "root", ""} {
+		if r.Valid() {
+			t.Errorf("%q should not be valid", r)
+		}
 	}
 }
 
@@ -736,10 +752,10 @@ func TestUsernamesAreUniqueIgnoringCase(t *testing.T) {
 	s := newStore(t)
 	ctx := context.Background()
 
-	if _, err := s.CreateUser(ctx, "Morgan", "hash", RoleViewer); err != nil {
+	if _, err := s.CreateUser(ctx, "Morgan", "hash", RoleAnalyst); err != nil {
 		t.Fatalf("CreateUser: %v", err)
 	}
-	if _, err := s.CreateUser(ctx, "morgan", "hash", RoleViewer); !errors.Is(err, ErrUsernameTaken) {
+	if _, err := s.CreateUser(ctx, "morgan", "hash", RoleAnalyst); !errors.Is(err, ErrUsernameTaken) {
 		t.Errorf("err = %v, want ErrUsernameTaken", err)
 	}
 }

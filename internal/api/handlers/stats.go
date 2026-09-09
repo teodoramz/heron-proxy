@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/amzteodor/proxy-waf/internal/api/reader"
+	"github.com/amzteodor/heron/internal/api/reader"
 )
 
 // Summary returns the headline numbers for a filtered range.

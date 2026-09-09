@@ -54,7 +54,6 @@ export function Settings() {
                         }
                         aria-label={`Role for ${u.username}`}
                       >
-                        <option value="viewer">viewer</option>
                         <option value="analyst">analyst</option>
                         <option value="admin">admin</option>
                       </select>
@@ -153,7 +152,7 @@ export function Settings() {
 function NewUser({ apps, onSaved }: { apps: App[]; onSaved: () => void }) {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
-  const [role, setRole] = useState('viewer')
+  const [role, setRole] = useState('analyst')
   const [scoped, setScoped] = useState<string[]>([])
   const [error, setError] = useState('')
 
@@ -204,7 +203,6 @@ function NewUser({ apps, onSaved }: { apps: App[]; onSaved: () => void }) {
         <div className="field" style={{ marginBottom: 0 }}>
           <label htmlFor="new-role">Role</label>
           <select id="new-role" className="select" value={role} onChange={(e) => setRole(e.target.value)}>
-            <option value="viewer">viewer</option>
             <option value="analyst">analyst</option>
             <option value="admin">admin</option>
           </select>

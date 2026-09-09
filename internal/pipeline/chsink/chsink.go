@@ -13,7 +13,7 @@ import (
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
-	"github.com/amzteodor/proxy-waf/internal/pipeline/event"
+	"github.com/amzteodor/heron/internal/pipeline/event"
 )
 
 //go:embed all:migrations
@@ -26,7 +26,7 @@ const insertStmt = `INSERT INTO traffic (
 	req_body_size, req_body_inline, req_body_sha256, req_body_blob, req_truncated, user_agent,
 	status, resp_headers, resp_size, resp_content_type,
 	duration_ms, upstream_ms, waf_ms,
-	anomaly_score, rule_ids, rule_msgs, rule_tags, rule_severity, paranoia_max, would_block,
+	anomaly_score, rule_ids, rule_msgs, rule_tags, rule_severity, paranoia_max, would_block, blocked,
 	upstream, error, is_websocket
 )`
 
@@ -105,7 +105,8 @@ func (w *Writer) WriteBatch(ctx context.Context, events []event.Event) error {
 			e.ReqBodySize, e.ReqBody, e.ReqBodySHA, e.ReqBodyBlob, b8(e.ReqTruncated), e.UserAgent,
 			e.Status, e.RespHeaders, e.RespSize, e.RespContentType,
 			e.DurationMS, e.UpstreamMS, e.WAFMS,
-			e.AnomalyScore, e.RuleIDs, e.RuleMsgs, e.RuleTags, e.RuleSeverity, e.ParanoiaMax, b8(e.WouldBlock),
+			e.AnomalyScore, e.RuleIDs, e.RuleMsgs, e.RuleTags, e.RuleSeverity, e.ParanoiaMax,
+			b8(e.WouldBlock), b8(e.Blocked),
 			e.Upstream, e.Error, b8(e.IsWebsocket),
 		)
 		if err != nil {

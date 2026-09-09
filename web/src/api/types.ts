@@ -1,4 +1,4 @@
-export type Role = 'admin' | 'analyst' | 'viewer'
+export type Role = 'admin' | 'analyst'
 
 export interface User {
   id: string
@@ -48,6 +48,7 @@ export interface TrafficEvent {
   rule_severity: number
   paranoia_max: number
   would_block: boolean
+  blocked: boolean
   upstream: string
   error: string
   is_websocket: boolean
@@ -126,6 +127,7 @@ export interface Summary {
   requests: number
   clients: number
   would_block: number
+  blocked: number
   errors: number
   bytes: number
   p50_duration_ms: number
@@ -197,7 +199,7 @@ export interface App {
   enabled: boolean
   capture: { enabled: boolean; body_cap_bytes: number; inline_max_bytes: number; skip_paths: string[] }
   redaction: { enabled: boolean; headers: string[]; fields: string[]; mask: string }
-  waf: { enabled: boolean; paranoia_level: number; threshold: number }
+  waf: { enabled: boolean; mode: 'detect' | 'block'; paranoia_level: number; threshold: number }
 }
 
 export interface Certificate {

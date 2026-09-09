@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/amzteodor/proxy-waf/internal/api/query"
-	"github.com/amzteodor/proxy-waf/internal/store"
+	"github.com/amzteodor/heron/internal/api/query"
+	"github.com/amzteodor/heron/internal/store"
 )
 
 // ListFilters returns the caller's saved filters plus shared ones.

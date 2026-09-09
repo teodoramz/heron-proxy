@@ -7,7 +7,7 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"github.com/amzteodor/proxy-waf/internal/config"
+	"github.com/amzteodor/heron/internal/config"
 )
 
 type routes struct {

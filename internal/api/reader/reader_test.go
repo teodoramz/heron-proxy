@@ -10,18 +10,16 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/amzteodor/proxy-waf/internal/api/query"
-	"github.com/amzteodor/proxy-waf/internal/pipeline/chsink"
-	"github.com/amzteodor/proxy-waf/internal/pipeline/event"
+	"github.com/amzteodor/heron/internal/api/query"
+	"github.com/amzteodor/heron/internal/pipeline/chsink"
+	"github.com/amzteodor/heron/internal/pipeline/event"
 )
 
 var (
 	baseTime = time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
 
-	// Each run owns two app identifiers and filters on them. Sharing the table
-	// with other suites is then harmless, and nothing has to be truncated:
-	// TRUNCATE on the Atomic engine is deferred, so under load it can complete
-	// after the insert and take the fixture with it.
+	// Each run owns its app identifiers, so nothing has to be truncated:
+	// TRUNCATE is deferred on the Atomic engine and can wipe a fresh insert.
 	runID  = fmt.Sprintf("r%d", time.Now().UnixNano())
 	appAPI = runID + "-api"
 	appWeb = runID + "-web"
@@ -338,7 +336,7 @@ func representativeConditions(field string) []query.Condition {
 			{Field: field, Op: query.OpEq, Key: "content-type", Value: "application/json"},
 			{Field: field, Op: query.OpContains, Key: "content-type", Value: "json"},
 		}
-	case "would_block", "req_truncated", "is_websocket":
+	case "would_block", "blocked", "req_truncated", "is_websocket":
 		return []query.Condition{{Field: field, Op: query.OpEq, Value: true}}
 	case "asn", "status", "resp_size", "req_body_size", "duration_ms", "upstream_ms",
 		"waf_ms", "anomaly_score", "rule_severity", "paranoia_max":

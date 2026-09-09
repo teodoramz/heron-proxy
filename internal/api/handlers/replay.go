@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/amzteodor/proxy-waf/internal/store"
+	"github.com/amzteodor/heron/internal/store"
 )
 
 // ReplayRequest describes a request to send, based on a recorded event.

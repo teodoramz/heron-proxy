@@ -3,7 +3,7 @@ package handlers
 import (
 	"net/http"
 
-	"github.com/amzteodor/proxy-waf/internal/store"
+	"github.com/amzteodor/heron/internal/store"
 )
 
 // ListExclusions returns tuning exclusions, optionally for one app.

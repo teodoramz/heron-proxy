@@ -13,17 +13,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/amzteodor/proxy-waf/internal/api/query"
-	"github.com/amzteodor/proxy-waf/internal/api/reader"
-	"github.com/amzteodor/proxy-waf/internal/config"
-	"github.com/amzteodor/proxy-waf/internal/pipeline"
-	"github.com/amzteodor/proxy-waf/internal/pipeline/blob"
-	"github.com/amzteodor/proxy-waf/internal/pipeline/chsink"
-	"github.com/amzteodor/proxy-waf/internal/pipeline/event"
-	"github.com/amzteodor/proxy-waf/internal/pipeline/spool"
-	"github.com/amzteodor/proxy-waf/internal/proxy"
-	"github.com/amzteodor/proxy-waf/internal/proxy/router"
-	"github.com/amzteodor/proxy-waf/internal/proxy/waf"
+	"github.com/amzteodor/heron/internal/api/query"
+	"github.com/amzteodor/heron/internal/api/reader"
+	"github.com/amzteodor/heron/internal/config"
+	"github.com/amzteodor/heron/internal/pipeline"
+	"github.com/amzteodor/heron/internal/pipeline/blob"
+	"github.com/amzteodor/heron/internal/pipeline/chsink"
+	"github.com/amzteodor/heron/internal/pipeline/event"
+	"github.com/amzteodor/heron/internal/pipeline/spool"
+	"github.com/amzteodor/heron/internal/proxy"
+	"github.com/amzteodor/heron/internal/proxy/router"
+	"github.com/amzteodor/heron/internal/proxy/waf"
 )
 
 type stack struct {

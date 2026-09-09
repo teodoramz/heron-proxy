@@ -22,13 +22,34 @@ type RedactionPolicy struct {
 	Mask    string   `json:"mask"`
 }
 
-// WAFPolicy configures Coraza for one app. The engine is always detection-only;
-// Threshold decides only whether an event is flagged as would-block.
+// Blocking modes.
+const (
+	// ModeDetect records what would have happened and forwards everything.
+	ModeDetect = "detect"
+	// ModeBlock rejects a request once its anomaly score reaches the threshold.
+	ModeBlock = "block"
+)
+
+// WAFPolicy configures Coraza for one app.
+//
+// The rule engine itself is always detection-only. Whether a request is
+// actually rejected is decided here, from the same anomaly score the simulator
+// reports, so enforcing does exactly what the simulation said it would.
 type WAFPolicy struct {
 	Enabled       bool     `json:"enabled"`
+	Mode          string   `json:"mode"`
 	ParanoiaLevel int      `json:"paranoia_level"`
 	Threshold     int      `json:"threshold"`
 	ExtraRules    []string `json:"extra_rules"`
+}
+
+// Blocks reports whether this policy rejects requests rather than only
+// recording them.
+func (p WAFPolicy) Blocks() bool { return p.Enabled && p.Mode == ModeBlock }
+
+// ValidMode reports whether a mode is one this proxy understands.
+func ValidMode(mode string) bool {
+	return mode == ModeDetect || mode == ModeBlock
 }
 
 // App is one proxied application.
@@ -85,7 +106,9 @@ func DefaultRedaction() RedactionPolicy {
 
 // DefaultWAF returns the WAF policy applied to a new app.
 func DefaultWAF() WAFPolicy {
-	return WAFPolicy{Enabled: true, ParanoiaLevel: 1, Threshold: 5}
+	// New applications record rather than reject. Enforcing is something you
+	// turn on after reading what it would have cost.
+	return WAFPolicy{Enabled: true, Mode: ModeDetect, ParanoiaLevel: 1, Threshold: 5}
 }
 
 // ApplyDefaults fills unset fields on an app loaded from storage and normalizes
@@ -126,6 +149,9 @@ func (a *App) ApplyDefaults() {
 	}
 	if a.Redaction.Mask == "" {
 		a.Redaction.Mask = DefaultRedaction().Mask
+	}
+	if !ValidMode(a.WAF.Mode) {
+		a.WAF.Mode = ModeDetect
 	}
 	if a.WAF.ParanoiaLevel == 0 {
 		a.WAF.ParanoiaLevel = 1

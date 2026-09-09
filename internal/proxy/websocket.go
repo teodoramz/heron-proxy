@@ -11,9 +11,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/amzteodor/proxy-waf/internal/config"
-	"github.com/amzteodor/proxy-waf/internal/pipeline/event"
-	"github.com/amzteodor/proxy-waf/internal/proxy/waf"
+	"github.com/amzteodor/heron/internal/config"
+	"github.com/amzteodor/heron/internal/pipeline/event"
+	"github.com/amzteodor/heron/internal/proxy/waf"
 )
 
 // serveWebSocket evaluates the upgrade handshake, then relays the connection

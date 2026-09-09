@@ -95,10 +95,12 @@ form-encoded bodies are masked structurally; other content types are left alone.
 | Field | Default | Purpose |
 | --- | --- | --- |
 | `enabled` | `true` | Evaluate CRS for this app. |
+| `mode` | `detect` | `detect` records and forwards; `block` rejects at the threshold. |
 | `paranoia_level` | `1` | 1–4. Higher catches more and produces more false positives. |
-| `threshold` | `5` | Anomaly score at which an event is flagged `would_block`. |
+| `threshold` | `5` | Anomaly score at which a request is flagged, and rejected under `block`. |
 
-The engine is always `DetectionOnly`. `threshold` changes only what is flagged.
+The rule engine is always `DetectionOnly`; `mode` decides what the proxy does
+with the verdict.
 
 ## Custom rules
 

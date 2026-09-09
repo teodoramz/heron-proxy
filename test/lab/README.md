@@ -1,6 +1,6 @@
 # Lab traffic generators
 
-Scripts that drive traffic at a local proxy-waf instance, so its detection,
+Scripts that drive traffic at a local Heron Proxy instance, so its detection,
 recording and tuning views can be exercised against realistic input.
 
 They only ever target the local lab: the address must be loopback and the
@@ -13,7 +13,7 @@ The lab needs apps whose hostnames match, each pointed at an upstream, and a
 certificate covering those names. With the compose stack running:
 
 ```bash
-docker run -d --name pw-shop --network proxy-waf_default mccutchen/go-httpbin:v2.15.0
+docker run -d --name pw-shop --network heron_default mccutchen/go-httpbin:v2.15.0
 openssl req -x509 -newkey rsa:2048 -nodes -keyout lab.key -out lab.crt -days 30 \
   -subj "/CN=lab.local" \
   -addext "subjectAltName=DNS:shop.local,DNS:api.local,DNS:blog.local,DNS:demo.local"

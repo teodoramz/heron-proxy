@@ -14,6 +14,7 @@ const BLANK = {
   upstream_tls_verify: true,
   paranoia_level: 1,
   threshold: 5,
+  mode: 'detect',
 }
 
 export function Apps() {
@@ -48,7 +49,12 @@ export function Apps() {
         preserve_host: form.preserve_host,
         upstream_tls_verify: form.upstream_tls_verify,
         enabled: true,
-        waf: { enabled: true, paranoia_level: Number(form.paranoia_level), threshold: Number(form.threshold) },
+        waf: {
+          enabled: true,
+          mode: form.mode as 'detect' | 'block',
+          paranoia_level: Number(form.paranoia_level),
+          threshold: Number(form.threshold),
+        },
       } as Partial<App>)
       setNotice(`Saved ${form.id}. The proxy picks it up within a few seconds.`)
       setForm({ ...BLANK })
@@ -127,6 +133,7 @@ export function Apps() {
                     <th>ID</th>
                     <th>Hostnames</th>
                     <th>Upstream</th>
+                    <th>Mode</th>
                     <th className="num">Paranoia</th>
                     <th className="num">Threshold</th>
                     <th className="num">Retention</th>
@@ -139,6 +146,9 @@ export function Apps() {
                       <td>{a.id}</td>
                       <td>{a.hostnames.join(', ')}</td>
                       <td className="muted">{a.upstream_url}</td>
+                      <td className={a.waf.mode === 'block' ? 'blocked-flag' : 'muted'}>
+                        {a.waf.mode === 'block' ? 'enforcing' : 'detect only'}
+                      </td>
                       <td className="num">{a.waf.paranoia_level}</td>
                       <td className="num">{a.waf.threshold}</td>
                       <td className="num">{a.retention_days} d</td>
@@ -211,6 +221,23 @@ export function Apps() {
                   type="number"
                 />
               </div>
+              <div className="field">
+                <label htmlFor="mode">What to do with a request over the threshold</label>
+                <select
+                  id="mode"
+                  className="select"
+                  value={form.mode}
+                  onChange={(e) => setForm({ ...form, mode: e.target.value })}
+                >
+                  <option value="detect">Record it and forward it anyway</option>
+                  <option value="block">Reject it with 403</option>
+                </select>
+                <span className="why muted">
+                  Start by recording. Check on Rule tuning what enforcing would have cost before
+                  turning it on.
+                </span>
+              </div>
+
               <label className="row" style={{ gap: 6, marginBottom: 8 }}>
                 <input
                   type="checkbox"

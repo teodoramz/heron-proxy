@@ -16,13 +16,13 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/amzteodor/proxy-waf/internal/config"
-	"github.com/amzteodor/proxy-waf/internal/pipeline/blob"
-	"github.com/amzteodor/proxy-waf/internal/pipeline/event"
-	"github.com/amzteodor/proxy-waf/internal/pipeline/redact"
-	"github.com/amzteodor/proxy-waf/internal/proxy/router"
-	"github.com/amzteodor/proxy-waf/internal/proxy/tlsx"
-	"github.com/amzteodor/proxy-waf/internal/proxy/waf"
+	"github.com/amzteodor/heron/internal/config"
+	"github.com/amzteodor/heron/internal/pipeline/blob"
+	"github.com/amzteodor/heron/internal/pipeline/event"
+	"github.com/amzteodor/heron/internal/pipeline/redact"
+	"github.com/amzteodor/heron/internal/proxy/router"
+	"github.com/amzteodor/heron/internal/proxy/tlsx"
+	"github.com/amzteodor/heron/internal/proxy/waf"
 )
 
 // Sink receives recorded events.
@@ -140,6 +140,16 @@ func (s *Server) serveHTTP(w http.ResponseWriter, r *http.Request, app *config.A
 		tx.ProcessRequest(r, e.ClientIP.String(), int(e.ClientPort), localAddr(r), localPort(r))
 		tx.WriteRequestBody(body.Body())
 		tx.ProcessRequestBody()
+
+		// The verdict is taken before forwarding, from the same anomaly score
+		// the simulator reports, so enforcing does what the simulation said.
+		if app.WAF.Blocks() && tx.Interim().WouldBlock {
+			e.Blocked = true
+			e.Error = "rejected: anomaly score reached this application's threshold"
+			s.reject(w, e.ID)
+			s.finish(&e, tx, body, http.StatusForbidden, w.Header(), 0, start, time.Time{})
+			return
+		}
 	}
 
 	outReq, err := s.buildUpstreamRequest(r, app, upstreamBody, e)
@@ -173,6 +183,15 @@ func (s *Server) serveHTTP(w http.ResponseWriter, r *http.Request, app *config.A
 
 	written := s.stream(w, resp)
 	s.finish(&e, tx, body, resp.StatusCode, respHeaders, written, start, upstreamStart)
+}
+
+// reject answers a request the policy refuses to forward. The request id is
+// returned so whoever was blocked can be told what to quote.
+func (s *Server) reject(w http.ResponseWriter, id string) {
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("X-Request-Id", id)
+	w.WriteHeader(http.StatusForbidden)
+	_, _ = fmt.Fprintf(w, "Request rejected.\nReference: %s\n", id)
 }
 
 // stream relays the response body without buffering it.

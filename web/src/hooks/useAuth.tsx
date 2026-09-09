@@ -12,7 +12,7 @@ interface AuthState {
   atLeast: (role: Role) => boolean
 }
 
-const rank: Record<Role, number> = { viewer: 1, analyst: 2, admin: 3 }
+const rank: Record<Role, number> = { analyst: 1, admin: 2 }
 const AuthContext = createContext<AuthState | null>(null)
 
 export function AuthProvider({ children }: { children: ReactNode }) {

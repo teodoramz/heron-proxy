@@ -234,7 +234,7 @@ func TestNonTLSBytesAreReplayedIntact(t *testing.T) {
 }
 
 func TestCAMintsForAnyName(t *testing.T) {
-	ca, err := NewCA("proxy-waf test authority")
+	ca, err := NewCA("heron test authority")
 	if err != nil {
 		t.Fatalf("NewCA: %v", err)
 	}
@@ -251,7 +251,7 @@ func TestCAMintsForAnyName(t *testing.T) {
 }
 
 func TestCAVerifiesAgainstItself(t *testing.T) {
-	ca, _ := NewCA("proxy-waf test authority")
+	ca, _ := NewCA("heron test authority")
 	leaf, err := ca.Leaf("verify.example")
 	if err != nil {
 		t.Fatal(err)
@@ -266,7 +266,7 @@ func TestCAVerifiesAgainstItself(t *testing.T) {
 }
 
 func TestCACachesPerName(t *testing.T) {
-	ca, _ := NewCA("proxy-waf test authority")
+	ca, _ := NewCA("heron test authority")
 	first, _ := ca.Leaf("cache.example")
 	second, _ := ca.Leaf("CACHE.example.")
 	if first != second {
@@ -282,7 +282,7 @@ func TestCACachesPerName(t *testing.T) {
 }
 
 func TestCARoundTripsThroughPEM(t *testing.T) {
-	original, _ := NewCA("proxy-waf test authority")
+	original, _ := NewCA("heron test authority")
 	keyPEM, err := original.KeyPEM()
 	if err != nil {
 		t.Fatal(err)
@@ -314,7 +314,7 @@ func TestCertStoreFallsBackToTheAuthority(t *testing.T) {
 		t.Fatal("an unknown name resolved with no authority installed")
 	}
 
-	ca, _ := NewCA("proxy-waf test authority")
+	ca, _ := NewCA("heron test authority")
 	s.SetCA(ca)
 
 	got, err := s.GetCertificate(&tls.ClientHelloInfo{ServerName: "unknown.example"})
@@ -336,7 +336,7 @@ func TestCertStoreFallsBackToTheAuthority(t *testing.T) {
 // that trusts it can complete a handshake for a name nobody uploaded.
 func TestHandshakeWithMintedCertificate(t *testing.T) {
 	store := NewCertStore()
-	ca, _ := NewCA("proxy-waf test authority")
+	ca, _ := NewCA("heron test authority")
 	store.SetCA(ca)
 
 	raw, err := net.Listen("tcp", "127.0.0.1:0")

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/amzteodor/proxy-waf/internal/config"
+	"github.com/amzteodor/heron/internal/config"
 )
 
 func testEngine(t *testing.T) *Engine {

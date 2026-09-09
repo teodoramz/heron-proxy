@@ -21,8 +21,8 @@ export default function App() {
     <div className="shell">
       <nav className="rail">
         <div className="rail-brand">
-          proxy-waf
-          <span>detection only</span>
+          Heron Proxy
+          <span>traffic analyser</span>
         </div>
         <div className="rail-nav">
           <NavLink className="rail-link" to="/">

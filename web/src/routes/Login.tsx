@@ -24,7 +24,7 @@ export function Login() {
   return (
     <div className="login-page">
       <form className="login-card" onSubmit={submit}>
-        <h1>proxy-waf</h1>
+        <h1>Heron Proxy</h1>
         <p className="sub">Sign in to review recorded traffic.</p>
 
         {error && <p className="error-msg">{error}</p>}

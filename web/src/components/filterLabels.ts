@@ -35,6 +35,7 @@ export const FIELD_LABELS: Record<string, string> = {
   rule_severity: 'Severity',
   paranoia_max: 'Paranoia level',
   would_block: 'Flagged suspicious',
+  blocked: 'Rejected by the proxy',
   upstream: 'Sent to',
   error: 'Error',
   is_websocket: 'WebSocket',
@@ -65,6 +66,7 @@ export const FIELD_HELP: Record<string, { what: string; example: string }> = {
   ja3: { what: 'A fingerprint of the TLS handshake. Follows a client across addresses.', example: '03117a8e' },
   ja4: { what: 'A newer TLS fingerprint. Its prefix groups clients by stack.', example: 't13d' },
   would_block: { what: 'Whether the score passed this application’s threshold.', example: 'Yes' },
+  blocked: { what: 'Whether the request was actually rejected. Only happens where enforcing is on.', example: 'Yes' },
   anomaly_score: { what: 'How much rule evidence accumulated. Higher is more suspicious.', example: '5' },
   rule_id: { what: 'A specific Core Rule Set rule. Look one up on the Rules page.', example: '942100' },
   rule_tag: { what: 'The kind of attack a rule detects.', example: 'attack-sqli' },
@@ -148,6 +150,7 @@ export function describe(field: string, op: Op, value: unknown, key?: string): s
   const name = key ? `${fieldLabel(field)} “${key}”` : fieldLabel(field)
   if (op === 'exists') return `${name} is present`
   if (field === 'would_block') return value ? 'Flagged suspicious' : 'Not flagged'
+  if (field === 'blocked') return value ? 'Rejected by the proxy' : 'Not rejected'
   return `${name} ${OP_LABELS[op] ?? op} ${String(value)}`
 }
 
@@ -171,6 +174,12 @@ export const PRESETS: Preset[] = [
     label: 'Rule matches',
     title: 'Requests where at least one rule fired',
     conditions: [{ field: 'anomaly_score', op: 'gte', value: 1 }],
+  },
+  {
+    id: 'blocked',
+    label: 'Rejected',
+    title: 'Requests the proxy refused to forward',
+    conditions: [{ field: 'blocked', op: 'eq', value: true }],
   },
   {
     id: 'errors',

@@ -6,9 +6,9 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/amzteodor/proxy-waf/internal/api/auth"
-	"github.com/amzteodor/proxy-waf/internal/api/handlers"
-	"github.com/amzteodor/proxy-waf/internal/store"
+	"github.com/amzteodor/heron/internal/api/auth"
+	"github.com/amzteodor/heron/internal/api/handlers"
+	"github.com/amzteodor/heron/internal/store"
 )
 
 // Options configures the router.
@@ -38,75 +38,76 @@ func NewRouter(o Options) http.Handler {
 	})
 	mux.Handle("POST /api/auth/login", http.HandlerFunc(h.Login))
 
-	viewer := chain(o.Auth.Authenticate, o.Auth.CSRF, auth.RequireRole(store.RoleViewer))
+	// Everyone signed in is at least an analyst, so reading and analysing share
+	// one gate; admin is the only step up.
 	analyst := chain(o.Auth.Authenticate, o.Auth.CSRF, auth.RequireRole(store.RoleAnalyst))
 	admin := chain(o.Auth.Authenticate, o.Auth.CSRF, auth.RequireRole(store.RoleAdmin))
 
 	// Session.
-	mux.Handle("POST /api/auth/logout", viewer(http.HandlerFunc(h.Logout)))
-	mux.Handle("GET /api/me", viewer(http.HandlerFunc(h.Me)))
+	mux.Handle("POST /api/auth/logout", analyst(http.HandlerFunc(h.Logout)))
+	mux.Handle("GET /api/me", analyst(http.HandlerFunc(h.Me)))
 
 	// Traffic.
-	mux.Handle("GET /api/traffic", viewer(http.HandlerFunc(h.ListTraffic)))
-	mux.Handle("POST /api/traffic/search", viewer(http.HandlerFunc(h.ListTraffic)))
-	mux.Handle("GET /api/traffic/count", viewer(http.HandlerFunc(h.CountTraffic)))
-	mux.Handle("POST /api/traffic/count", viewer(http.HandlerFunc(h.CountTraffic)))
-	mux.Handle("GET /api/traffic/bookmarks", viewer(http.HandlerFunc(h.Bookmarks)))
-	mux.Handle("GET /api/traffic/{id}", viewer(http.HandlerFunc(h.GetTraffic)))
-	mux.Handle("GET /api/traffic/{id}/export", viewer(http.HandlerFunc(h.ExportTraffic)))
+	mux.Handle("GET /api/traffic", analyst(http.HandlerFunc(h.ListTraffic)))
+	mux.Handle("POST /api/traffic/search", analyst(http.HandlerFunc(h.ListTraffic)))
+	mux.Handle("GET /api/traffic/count", analyst(http.HandlerFunc(h.CountTraffic)))
+	mux.Handle("POST /api/traffic/count", analyst(http.HandlerFunc(h.CountTraffic)))
+	mux.Handle("GET /api/traffic/bookmarks", analyst(http.HandlerFunc(h.Bookmarks)))
+	mux.Handle("GET /api/traffic/{id}", analyst(http.HandlerFunc(h.GetTraffic)))
+	mux.Handle("GET /api/traffic/{id}/export", analyst(http.HandlerFunc(h.ExportTraffic)))
 	mux.Handle("POST /api/traffic/{id}/annotate", analyst(http.HandlerFunc(h.Annotate)))
 	mux.Handle("POST /api/traffic/{id}/verdict", analyst(http.HandlerFunc(h.MarkFP)))
 	mux.Handle("POST /api/traffic/{id}/replay", analyst(http.HandlerFunc(h.Replay)))
 
 	// Live tail. The websocket handshake is a GET, so CSRF does not apply.
-	stream := chain(o.Auth.Authenticate, auth.RequireRole(store.RoleViewer))
+	stream := chain(o.Auth.Authenticate, auth.RequireRole(store.RoleAnalyst))
 	mux.Handle("GET /api/stream", stream(http.HandlerFunc(h.Stream)))
-	mux.Handle("GET /api/stream/status", viewer(http.HandlerFunc(h.StreamStatus)))
+	mux.Handle("GET /api/stream/status", analyst(http.HandlerFunc(h.StreamStatus)))
 
 	// Statistics.
-	mux.Handle("GET /api/stats/summary", viewer(http.HandlerFunc(h.Summary)))
-	mux.Handle("POST /api/stats/summary", viewer(http.HandlerFunc(h.Summary)))
-	mux.Handle("GET /api/stats/series", viewer(http.HandlerFunc(h.TimeSeries)))
-	mux.Handle("POST /api/stats/series", viewer(http.HandlerFunc(h.TimeSeries)))
-	mux.Handle("GET /api/stats/rules", viewer(http.HandlerFunc(h.TopRules)))
-	mux.Handle("POST /api/stats/rules", viewer(http.HandlerFunc(h.TopRules)))
-	mux.Handle("GET /api/stats/ips", viewer(http.HandlerFunc(h.TopIPs)))
-	mux.Handle("POST /api/stats/ips", viewer(http.HandlerFunc(h.TopIPs)))
-	mux.Handle("GET /api/stats/top/{field}", viewer(http.HandlerFunc(h.TopBy)))
-	mux.Handle("POST /api/stats/top/{field}", viewer(http.HandlerFunc(h.TopBy)))
-	mux.Handle("GET /api/simulate", viewer(http.HandlerFunc(h.Simulate)))
-	mux.Handle("POST /api/simulate", viewer(http.HandlerFunc(h.Simulate)))
-	mux.Handle("GET /api/ip/{ip}", viewer(http.HandlerFunc(h.IPProfile)))
+	mux.Handle("GET /api/stats/summary", analyst(http.HandlerFunc(h.Summary)))
+	mux.Handle("POST /api/stats/summary", analyst(http.HandlerFunc(h.Summary)))
+	mux.Handle("GET /api/stats/series", analyst(http.HandlerFunc(h.TimeSeries)))
+	mux.Handle("POST /api/stats/series", analyst(http.HandlerFunc(h.TimeSeries)))
+	mux.Handle("GET /api/stats/rules", analyst(http.HandlerFunc(h.TopRules)))
+	mux.Handle("POST /api/stats/rules", analyst(http.HandlerFunc(h.TopRules)))
+	mux.Handle("GET /api/stats/ips", analyst(http.HandlerFunc(h.TopIPs)))
+	mux.Handle("POST /api/stats/ips", analyst(http.HandlerFunc(h.TopIPs)))
+	mux.Handle("GET /api/stats/top/{field}", analyst(http.HandlerFunc(h.TopBy)))
+	mux.Handle("POST /api/stats/top/{field}", analyst(http.HandlerFunc(h.TopBy)))
+	mux.Handle("GET /api/simulate", analyst(http.HandlerFunc(h.Simulate)))
+	mux.Handle("POST /api/simulate", analyst(http.HandlerFunc(h.Simulate)))
+	mux.Handle("GET /api/ip/{ip}", analyst(http.HandlerFunc(h.IPProfile)))
 
 	// Saved filters.
-	mux.Handle("GET /api/filters", viewer(http.HandlerFunc(h.ListFilters)))
-	mux.Handle("GET /api/filters/schema", viewer(http.HandlerFunc(h.FilterSchema)))
+	mux.Handle("GET /api/filters", analyst(http.HandlerFunc(h.ListFilters)))
+	mux.Handle("GET /api/filters/schema", analyst(http.HandlerFunc(h.FilterSchema)))
 	mux.Handle("POST /api/filters", analyst(http.HandlerFunc(h.SaveFilter)))
 	mux.Handle("DELETE /api/filters/{id}", analyst(http.HandlerFunc(h.DeleteFilter)))
 
 	// The rule catalogue is reference material, readable by anyone signed in.
-	mux.Handle("GET /api/rules", viewer(http.HandlerFunc(h.ListRules)))
-	mux.Handle("GET /api/rules/facets", viewer(http.HandlerFunc(h.RuleFacets)))
-	mux.Handle("GET /api/rules/{id}", viewer(http.HandlerFunc(h.GetRule)))
+	mux.Handle("GET /api/rules", analyst(http.HandlerFunc(h.ListRules)))
+	mux.Handle("GET /api/rules/facets", analyst(http.HandlerFunc(h.RuleFacets)))
+	mux.Handle("GET /api/rules/{id}", analyst(http.HandlerFunc(h.GetRule)))
 
 	// Rule tuning.
-	mux.Handle("GET /api/exclusions", viewer(http.HandlerFunc(h.ListExclusions)))
-	mux.Handle("GET /api/exclusions/verdicts", viewer(http.HandlerFunc(h.FPSummaries)))
+	mux.Handle("GET /api/exclusions", analyst(http.HandlerFunc(h.ListExclusions)))
+	mux.Handle("GET /api/exclusions/verdicts", analyst(http.HandlerFunc(h.FPSummaries)))
 	mux.Handle("POST /api/exclusions/preview", analyst(http.HandlerFunc(h.PreviewExclusion)))
 	mux.Handle("POST /api/exclusions", analyst(http.HandlerFunc(h.CreateExclusion)))
 	mux.Handle("PATCH /api/exclusions/{id}", analyst(http.HandlerFunc(h.SetExclusionEnabled)))
 	mux.Handle("DELETE /api/exclusions/{id}", analyst(http.HandlerFunc(h.DeleteExclusion)))
 
 	// Applications and certificates.
-	mux.Handle("GET /api/apps", viewer(http.HandlerFunc(h.ListApps)))
-	mux.Handle("GET /api/apps/{id}", viewer(http.HandlerFunc(h.GetApp)))
+	mux.Handle("GET /api/apps", analyst(http.HandlerFunc(h.ListApps)))
+	mux.Handle("GET /api/apps/{id}", analyst(http.HandlerFunc(h.GetApp)))
 	mux.Handle("POST /api/apps", admin(http.HandlerFunc(h.SaveApp)))
 	mux.Handle("PUT /api/apps/{id}", admin(http.HandlerFunc(h.SaveApp)))
 	mux.Handle("DELETE /api/apps/{id}", admin(http.HandlerFunc(h.DeleteApp)))
 	// The authority certificate is public by nature: it is meant to be
 	// installed as trusted, and holds no secret.
-	mux.Handle("GET /api/ca", viewer(http.HandlerFunc(h.CertificateAuthority)))
-	mux.Handle("GET /api/ca.crt", viewer(http.HandlerFunc(h.DownloadCertificateAuthority)))
+	mux.Handle("GET /api/ca", analyst(http.HandlerFunc(h.CertificateAuthority)))
+	mux.Handle("GET /api/ca.crt", analyst(http.HandlerFunc(h.DownloadCertificateAuthority)))
 	mux.Handle("POST /api/ca/regenerate", admin(http.HandlerFunc(h.RegenerateCertificateAuthority)))
 
 	mux.Handle("GET /api/certificates", admin(http.HandlerFunc(h.ListCertificates)))

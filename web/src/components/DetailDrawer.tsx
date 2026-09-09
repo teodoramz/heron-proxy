@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, type ReplayResult } from '../api/client'
 import type { EventDetail } from '../api/types'
-import { useAuth } from '../hooks/useAuth'
 import { bytes, duration, fullTime, statusClass } from './format'
 
 type Tab = 'overview' | 'request' | 'response' | 'waf' | 'client' | 'replay'
@@ -327,7 +326,6 @@ function ClientTab({ detail }: { detail: EventDetail }) {
 }
 
 function ReplayTab({ detail }: { detail: EventDetail }) {
-  const { atLeast } = useAuth()
   const [target, setTarget] = useState('')
   const [raw, setRaw] = useState('')
   const [result, setResult] = useState<ReplayResult | null>(null)
@@ -341,8 +339,6 @@ function ReplayTab({ detail }: { detail: EventDetail }) {
       .then(setRaw)
       .catch(() => setRaw(`${detail.method} ${detail.path} HTTP/1.1\r\nHost: ${detail.host}\r\n\r\n`))
   }, [detail.id, detail.method, detail.path, detail.host])
-
-  if (!atLeast('analyst')) return <p className="muted">Replay needs the analyst role.</p>
 
   async function send() {
     setSending(true)

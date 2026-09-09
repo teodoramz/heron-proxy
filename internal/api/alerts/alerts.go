@@ -13,8 +13,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/amzteodor/proxy-waf/internal/pipeline/event"
-	"github.com/amzteodor/proxy-waf/internal/store"
+	"github.com/amzteodor/heron/internal/pipeline/event"
+	"github.com/amzteodor/heron/internal/store"
 )
 
 // Source supplies the live event stream.

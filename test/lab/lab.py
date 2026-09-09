@@ -1,6 +1,6 @@
 """Shared plumbing for the lab traffic generators.
 
-These scripts drive traffic at a local proxy-waf instance so its detection,
+These scripts drive traffic at a local Heron Proxy instance so its detection,
 recording and tuning views can be exercised against realistic input. They are
 deliberately restricted to the local lab: the target must resolve to a loopback
 address, and only lab hostnames are accepted.

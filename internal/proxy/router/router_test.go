@@ -4,7 +4,7 @@ import (
 	"net/netip"
 	"testing"
 
-	"github.com/amzteodor/proxy-waf/internal/config"
+	"github.com/amzteodor/heron/internal/config"
 )
 
 func testApps() []config.App {

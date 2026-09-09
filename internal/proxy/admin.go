@@ -7,8 +7,8 @@ import (
 
 	"github.com/gorilla/websocket"
 
-	"github.com/amzteodor/proxy-waf/internal/pipeline"
-	"github.com/amzteodor/proxy-waf/internal/pipeline/event"
+	"github.com/amzteodor/heron/internal/pipeline"
+	"github.com/amzteodor/heron/internal/pipeline/event"
 )
 
 // Admin serves health, metrics and the internal event stream the API consumes
@@ -83,7 +83,6 @@ func (a *Admin) stream(w http.ResponseWriter, r *http.Request) {
 	events, cancel := a.Pipeline.Subscribe(1024)
 	defer cancel()
 
-	// Reading is only needed to observe the peer closing.
 	go func() {
 		for {
 			if _, _, err := conn.ReadMessage(); err != nil {

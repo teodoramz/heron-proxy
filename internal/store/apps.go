@@ -8,7 +8,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/amzteodor/proxy-waf/internal/config"
+	"github.com/amzteodor/heron/internal/config"
 )
 
 const appColumns = `id, name, hostnames, upstream_url, upstream_tls_verify, preserve_host,

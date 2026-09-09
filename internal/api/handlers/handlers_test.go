@@ -14,15 +14,15 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/amzteodor/proxy-waf/internal/api"
-	"github.com/amzteodor/proxy-waf/internal/api/auth"
-	"github.com/amzteodor/proxy-waf/internal/api/handlers"
-	"github.com/amzteodor/proxy-waf/internal/api/reader"
-	"github.com/amzteodor/proxy-waf/internal/config"
-	"github.com/amzteodor/proxy-waf/internal/pipeline/blob"
-	"github.com/amzteodor/proxy-waf/internal/pipeline/chsink"
-	"github.com/amzteodor/proxy-waf/internal/pipeline/event"
-	"github.com/amzteodor/proxy-waf/internal/store"
+	"github.com/amzteodor/heron/internal/api"
+	"github.com/amzteodor/heron/internal/api/auth"
+	"github.com/amzteodor/heron/internal/api/handlers"
+	"github.com/amzteodor/heron/internal/api/reader"
+	"github.com/amzteodor/heron/internal/config"
+	"github.com/amzteodor/heron/internal/pipeline/blob"
+	"github.com/amzteodor/heron/internal/pipeline/chsink"
+	"github.com/amzteodor/heron/internal/pipeline/event"
+	"github.com/amzteodor/heron/internal/store"
 )
 
 var seedTime = time.Date(2026, 4, 1, 9, 0, 0, 0, time.UTC)

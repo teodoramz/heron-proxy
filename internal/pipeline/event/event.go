@@ -61,6 +61,11 @@ type Event struct {
 	ParanoiaMax  uint8    `json:"paranoia_max"`
 	WouldBlock   bool     `json:"would_block"`
 
+	// Blocked records that the request was actually rejected, which only
+	// happens for an application in blocking mode. WouldBlock says the score
+	// crossed the threshold; Blocked says something was done about it.
+	Blocked bool `json:"blocked"`
+
 	Upstream    string `json:"upstream"`
 	Error       string `json:"error"`
 	IsWebsocket bool   `json:"is_websocket"`

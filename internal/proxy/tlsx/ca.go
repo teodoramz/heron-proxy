@@ -51,7 +51,7 @@ func NewCA(name string) (*CA, error) {
 	}
 	template := &x509.Certificate{
 		SerialNumber:          serial,
-		Subject:               pkix.Name{CommonName: name, Organization: []string{"proxy-waf"}},
+		Subject:               pkix.Name{CommonName: name, Organization: []string{"heron"}},
 		NotBefore:             time.Now().Add(-time.Hour),
 		NotAfter:              time.Now().Add(caLifetime),
 		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign | x509.KeyUsageDigitalSignature,
@@ -160,7 +160,7 @@ func (c *CA) mint(host string) (*tls.Certificate, error) {
 	}
 	template := &x509.Certificate{
 		SerialNumber:          serial,
-		Subject:               pkix.Name{CommonName: host, Organization: []string{"proxy-waf"}},
+		Subject:               pkix.Name{CommonName: host, Organization: []string{"heron"}},
 		NotBefore:             time.Now().Add(-time.Hour),
 		NotAfter:              time.Now().Add(leafLifetime),
 		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,

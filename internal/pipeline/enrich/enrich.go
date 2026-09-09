@@ -9,7 +9,7 @@ import (
 
 	"github.com/oschwald/maxminddb-golang"
 
-	"github.com/amzteodor/proxy-waf/internal/pipeline/event"
+	"github.com/amzteodor/heron/internal/pipeline/event"
 )
 
 // Enricher looks up MaxMind City and ASN databases. Either database may be

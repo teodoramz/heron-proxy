@@ -11,8 +11,8 @@ import (
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
 	"github.com/google/uuid"
 
-	"github.com/amzteodor/proxy-waf/internal/api/query"
-	"github.com/amzteodor/proxy-waf/internal/pipeline/event"
+	"github.com/amzteodor/heron/internal/api/query"
+	"github.com/amzteodor/heron/internal/pipeline/event"
 )
 
 // CountCap bounds an exact count; above it the UI shows "N+".
@@ -56,7 +56,6 @@ func (r *Reader) List(ctx context.Context, f query.Filter) (Page, error) {
 		return Page{}, fmt.Errorf("reader: list rows: %w", err)
 	}
 
-	// One extra row was requested to detect a following page.
 	if len(page.Events) > f.Limit {
 		page.Events = page.Events[:f.Limit]
 		page.HasMore = true
@@ -109,16 +108,16 @@ func (notFoundError) Error() string { return "reader: event not found" }
 
 func scanList(rows driver.Rows) (event.Event, error) {
 	var (
-		e                         event.Event
-		id                        uuid.UUID
-		clientIP, clientIPClaimed net.IP
-		truncated, wouldBlock, ws uint8
+		e                                  event.Event
+		id                                 uuid.UUID
+		clientIP, clientIPClaimed          net.IP
+		truncated, wouldBlock, blocked, ws uint8
 	)
 	err := rows.Scan(&id, &e.TS, &e.AppID, &clientIP, &clientIPClaimed, &e.Country, &e.ASN,
 		&e.JA3, &e.JA4, &e.Method, &e.Scheme, &e.Host, &e.Path, &e.Query, &e.HTTPVersion,
 		&e.ReqBodySize, &truncated, &e.UserAgent, &e.Status, &e.RespSize, &e.RespContentType,
 		&e.DurationMS, &e.UpstreamMS, &e.WAFMS, &e.AnomalyScore, &e.RuleIDs, &e.RuleTags,
-		&e.RuleSeverity, &e.ParanoiaMax, &wouldBlock, &e.Upstream, &e.Error, &ws,
+		&e.RuleSeverity, &e.ParanoiaMax, &wouldBlock, &blocked, &e.Upstream, &e.Error, &ws,
 		&e.ReqBodyPreview)
 	if err != nil {
 		return event.Event{}, fmt.Errorf("reader: scan: %w", err)
@@ -128,22 +127,23 @@ func scanList(rows driver.Rows) (event.Event, error) {
 	e.ClientIPClaimed = toAddr(clientIPClaimed)
 	e.ReqTruncated = truncated == 1
 	e.WouldBlock = wouldBlock == 1
+	e.Blocked = blocked == 1
 	e.IsWebsocket = ws == 1
 	return e, nil
 }
 
 func scanDetail(rows driver.Rows) (event.Event, error) {
 	var (
-		e                         event.Event
-		id                        uuid.UUID
-		clientIP, clientIPClaimed net.IP
-		truncated, wouldBlock, ws uint8
+		e                                  event.Event
+		id                                 uuid.UUID
+		clientIP, clientIPClaimed          net.IP
+		truncated, wouldBlock, blocked, ws uint8
 	)
 	err := rows.Scan(&id, &e.TS, &e.AppID, &clientIP, &clientIPClaimed, &e.Country, &e.ASN,
 		&e.JA3, &e.JA4, &e.Method, &e.Scheme, &e.Host, &e.Path, &e.Query, &e.HTTPVersion,
 		&e.ReqBodySize, &truncated, &e.UserAgent, &e.Status, &e.RespSize, &e.RespContentType,
 		&e.DurationMS, &e.UpstreamMS, &e.WAFMS, &e.AnomalyScore, &e.RuleIDs, &e.RuleTags,
-		&e.RuleSeverity, &e.ParanoiaMax, &wouldBlock, &e.Upstream, &e.Error, &ws,
+		&e.RuleSeverity, &e.ParanoiaMax, &wouldBlock, &blocked, &e.Upstream, &e.Error, &ws,
 		&e.ReqBodyPreview,
 		&e.ReqHeaders, &e.RespHeaders, &e.ReqBody, &e.ReqBodySHA, &e.ReqBodyBlob,
 		&e.RuleMsgs, &e.ClientPort, &e.ASOrg, &e.RetentionDays)
@@ -155,6 +155,7 @@ func scanDetail(rows driver.Rows) (event.Event, error) {
 	e.ClientIPClaimed = toAddr(clientIPClaimed)
 	e.ReqTruncated = truncated == 1
 	e.WouldBlock = wouldBlock == 1
+	e.Blocked = blocked == 1
 	e.IsWebsocket = ws == 1
 	return e, nil
 }

@@ -21,7 +21,7 @@ import (
 	"github.com/corazawaf/coraza/v3"
 	"github.com/corazawaf/coraza/v3/types"
 
-	"github.com/amzteodor/proxy-waf/internal/config"
+	"github.com/amzteodor/heron/internal/config"
 )
 
 // Rule IDs CRS uses to report that a threshold was crossed.
@@ -173,6 +173,8 @@ func (e *Engine) extraRules() (string, error) {
 	return b.String(), nil
 }
 
+// policyKey identifies an engine build. Mode is deliberately absent: the engine
+// is the same either way, and only what the proxy does with the verdict differs.
 func policyKey(p config.WAFPolicy, bodyLimit int) string {
 	return fmt.Sprintf("pl=%d;th=%d;bl=%d;extra=%s",
 		p.ParanoiaLevel, p.Threshold, bodyLimit, strings.Join(p.ExtraRules, "\x00"))
@@ -231,10 +233,19 @@ func (t *Tx) ProcessResponseHeaders(status int, proto string, h http.Header) {
 	t.tx.ProcessResponseHeaders(status, proto)
 }
 
+// Interim summarizes what has matched so far, without closing the transaction.
+//
+// Blocking needs a verdict before the request is forwarded, which is earlier
+// than the point where the event is finalized.
+func (t *Tx) Interim() Result { return t.summarize() }
+
 // Result finalizes the transaction and summarizes what matched.
 func (t *Tx) Result() Result {
 	t.tx.ProcessLogging()
+	return t.summarize()
+}
 
+func (t *Tx) summarize() Result {
 	res := Result{Elapsed: time.Since(t.start), WouldBlock: t.tx.IsInterrupted()}
 	tagSet := make(map[string]struct{})
 	var score int

@@ -1,4 +1,4 @@
-/* proxy-waf — a forensics tool. Density first; color only ever carries meaning. */
+/* Heron Proxy — a forensics tool. Density first; colour only ever carries meaning. */
 
 :root {
   color-scheme: dark;
@@ -340,6 +340,9 @@ a:hover { text-decoration: underline; }
 .status-5xx { color: var(--s5xx); }
 
 .block-flag { color: var(--block); font-weight: 600; }
+
+/* A rejected request is a stronger statement than a flagged one. */
+.blocked-flag { color: var(--s5xx); font-weight: 600; }
 
 .tag {
   font-family: var(--font-data);

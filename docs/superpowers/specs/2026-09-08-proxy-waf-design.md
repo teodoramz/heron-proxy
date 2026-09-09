@@ -1,5 +1,8 @@
 # proxy-waf — Design
 
+> Written before the project was named. It was renamed to Heron Proxy;
+> the module path is now `github.com/amzteodor/heron`.
+
 Status: approved
 Date: 2026-09-08
 

@@ -4,8 +4,8 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/amzteodor/proxy-waf/internal/api/auth"
-	"github.com/amzteodor/proxy-waf/internal/store"
+	"github.com/amzteodor/heron/internal/api/auth"
+	"github.com/amzteodor/heron/internal/store"
 )
 
 type loginRequest struct {
@@ -95,7 +95,7 @@ func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !req.Role.Valid() {
-		writeError(w, http.StatusBadRequest, "role must be admin, analyst or viewer")
+		writeError(w, http.StatusBadRequest, "role must be admin or analyst")
 		return
 	}
 	hash, err := auth.HashPassword(req.Password)

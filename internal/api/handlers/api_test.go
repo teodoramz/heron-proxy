@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/amzteodor/proxy-waf/internal/store"
+	"github.com/amzteodor/heron/internal/store"
 )
 
 func TestLoginRejectsBadCredentials(t *testing.T) {
@@ -50,13 +50,13 @@ func TestUnauthenticatedRequestsRejected(t *testing.T) {
 
 func TestMe(t *testing.T) {
 	h := newHarness(t)
-	c := h.login(t, "viewer", store.RoleViewer, nil)
+	c := h.login(t, "reader", store.RoleAnalyst, nil)
 
 	var out struct {
 		User store.User `json:"user"`
 	}
 	c.decode(c.get("/api/me"), http.StatusOK, &out)
-	if out.User.Username != "viewer" || out.User.Role != store.RoleViewer {
+	if out.User.Username != "reader" || out.User.Role != store.RoleAnalyst {
 		t.Errorf("user = %+v", out.User)
 	}
 }
@@ -161,23 +161,9 @@ func TestGetTrafficDetail(t *testing.T) {
 	}
 }
 
-func TestViewerCannotSeeBodies(t *testing.T) {
-	h := newHarness(t)
-	c := h.login(t, "viewer", store.RoleViewer, nil)
-
-	var detail map[string]any
-	c.decode(c.get("/api/traffic/"+h.events[1].ID), http.StatusOK, &detail)
-	if body, ok := detail["body"].(string); ok && body != "" {
-		t.Errorf("viewer saw a request body: %q", body)
-	}
-	if inline, ok := detail["req_body_inline"].(string); ok && inline != "" {
-		t.Errorf("viewer saw the inline body: %q", inline)
-	}
-}
-
 func TestGetTrafficMissing(t *testing.T) {
 	h := newHarness(t)
-	c := h.login(t, "viewer", store.RoleViewer, nil)
+	c := h.login(t, "reader", store.RoleAnalyst, nil)
 	resp := c.get("/api/traffic/3a1f2b4c-5d6e-4f70-8192-a3b4c5d6e7f8")
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusNotFound {
@@ -211,7 +197,7 @@ func TestExportFormats(t *testing.T) {
 
 func TestCount(t *testing.T) {
 	h := newHarness(t)
-	c := h.login(t, "viewer", store.RoleViewer, nil)
+	c := h.login(t, "reader", store.RoleAnalyst, nil)
 
 	var out struct {
 		Count  int  `json:"count"`
@@ -225,7 +211,7 @@ func TestCount(t *testing.T) {
 
 func TestStatsEndpoints(t *testing.T) {
 	h := newHarness(t)
-	c := h.login(t, "viewer", store.RoleViewer, nil)
+	c := h.login(t, "reader", store.RoleAnalyst, nil)
 	rng := "?from=2026-04-01T00:00:00Z&to=2026-04-02T00:00:00Z"
 
 	var summary struct {
@@ -248,7 +234,7 @@ func TestStatsEndpoints(t *testing.T) {
 
 func TestSimulateThreshold(t *testing.T) {
 	h := newHarness(t)
-	c := h.login(t, "viewer", store.RoleViewer, nil)
+	c := h.login(t, "reader", store.RoleAnalyst, nil)
 
 	var sim struct {
 		Total      int `json:"total"`
@@ -263,7 +249,7 @@ func TestSimulateThreshold(t *testing.T) {
 
 func TestSimulateRejectsBadThreshold(t *testing.T) {
 	h := newHarness(t)
-	c := h.login(t, "viewer", store.RoleViewer, nil)
+	c := h.login(t, "reader", store.RoleAnalyst, nil)
 	resp := c.get("/api/simulate?threshold=abc")
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusBadRequest {
@@ -273,7 +259,7 @@ func TestSimulateRejectsBadThreshold(t *testing.T) {
 
 func TestIPProfile(t *testing.T) {
 	h := newHarness(t)
-	c := h.login(t, "viewer", store.RoleViewer, nil)
+	c := h.login(t, "reader", store.RoleAnalyst, nil)
 
 	var profile struct {
 		ClientIP string `json:"client_ip"`
@@ -290,19 +276,10 @@ func TestIPProfile(t *testing.T) {
 
 func TestRoleGating(t *testing.T) {
 	h := newHarness(t)
-	viewer := h.login(t, "viewer", store.RoleViewer, nil)
 	analyst := h.login(t, "analyst", store.RoleAnalyst, nil)
 
-	// Viewer may not annotate.
-	resp := viewer.do(http.MethodPost, "/api/traffic/"+h.events[0].ID+"/annotate",
-		map[string]any{"app_id": "api", "note": "x"})
-	resp.Body.Close()
-	if resp.StatusCode != http.StatusForbidden {
-		t.Errorf("viewer annotate = %d, want 403", resp.StatusCode)
-	}
-
-	// Analyst may not manage apps.
-	resp = analyst.do(http.MethodPost, "/api/apps", map[string]any{
+	// An analyst may not manage apps.
+	resp := analyst.do(http.MethodPost, "/api/apps", map[string]any{
 		"id": "new", "hostnames": []string{"new.example"}, "upstream_url": "http://127.0.0.1:9",
 	})
 	resp.Body.Close()
@@ -392,7 +369,7 @@ func TestUserManagement(t *testing.T) {
 	}), http.StatusCreated, &created)
 
 	resp := c.do(http.MethodPatch, "/api/users/"+created.ID,
-		map[string]any{"role": "viewer", "enabled": true})
+		map[string]any{"role": "analyst", "enabled": true})
 	resp.Body.Close()
 	if resp.StatusCode != http.StatusNoContent {
 		t.Errorf("patch = %d", resp.StatusCode)
@@ -565,7 +542,7 @@ func TestSavedFilterRejectsInvalidQuery(t *testing.T) {
 
 func TestFilterSchema(t *testing.T) {
 	h := newHarness(t)
-	c := h.login(t, "viewer", store.RoleViewer, nil)
+	c := h.login(t, "reader", store.RoleAnalyst, nil)
 
 	var schema struct {
 		Fields []struct {
@@ -665,7 +642,7 @@ func TestReplayCustomTargetRequiresAdmin(t *testing.T) {
 
 func TestLogout(t *testing.T) {
 	h := newHarness(t)
-	c := h.login(t, "viewer", store.RoleViewer, nil)
+	c := h.login(t, "reader", store.RoleAnalyst, nil)
 
 	resp := c.do(http.MethodPost, "/api/auth/logout", nil)
 	resp.Body.Close()
@@ -846,7 +823,7 @@ func TestReplayRejectsUnparseableRaw(t *testing.T) {
 
 func TestRuleCatalogueEndpoints(t *testing.T) {
 	h := newHarness(t)
-	c := h.login(t, "viewer", store.RoleViewer, nil)
+	c := h.login(t, "reader", store.RoleAnalyst, nil)
 
 	var facets struct {
 		Total      int      `json:"total"`

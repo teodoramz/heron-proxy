@@ -6,7 +6,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/amzteodor/proxy-waf/internal/api/query"
+	"github.com/amzteodor/heron/internal/api/query"
 )
 
 // Summary is the headline set of numbers for a filtered range.
@@ -14,6 +14,7 @@ type Summary struct {
 	Requests     uint64  `json:"requests"`
 	Clients      uint64  `json:"clients"`
 	WouldBlock   uint64  `json:"would_block"`
+	Blocked      uint64  `json:"blocked"`
 	Errors       uint64  `json:"errors"`
 	Bytes        uint64  `json:"bytes"`
 	P50Duration  float64 `json:"p50_duration_ms"`
@@ -33,6 +34,7 @@ func (r *Reader) Summary(ctx context.Context, f query.Filter) (Summary, error) {
 		count(),
 		uniq(client_ip),
 		countIf(would_block = 1),
+		countIf(blocked = 1),
 		countIf(status >= 400),
 		sum(resp_size),
 		quantile(0.5)(duration_ms),
@@ -44,7 +46,7 @@ func (r *Reader) Summary(ctx context.Context, f query.Filter) (Summary, error) {
 
 	var s Summary
 	err = r.conn.QueryRow(ctx, sql, args...).Scan(&s.Requests, &s.Clients, &s.WouldBlock,
-		&s.Errors, &s.Bytes, &s.P50Duration, &s.P95Duration, &s.P99Duration,
+		&s.Blocked, &s.Errors, &s.Bytes, &s.P50Duration, &s.P95Duration, &s.P99Duration,
 		&s.AvgAnomaly, &s.WebsocketNum)
 	if err != nil {
 		return Summary{}, fmt.Errorf("reader: summary: %w", err)
@@ -121,11 +123,8 @@ func (r *Reader) TopRules(ctx context.Context, f query.Filter, limit int) ([]Rul
 	if err != nil {
 		return nil, err
 	}
-	// Both arrays are joined together so each message stays paired with the rule
-	// that produced it; joining rule_ids alone would attribute an arbitrary
-	// message from the row to every rule in it. arrayResize keeps the two the
-	// same length, because ARRAY JOIN fails the whole query on a mismatch and
-	// rows written by earlier versions may be uneven.
+	// Joining both arrays keeps each message paired with its own rule.
+	// arrayResize guards the length mismatch that would fail the whole query.
 	sql := fmt.Sprintf(`SELECT rule_id, count() AS hits, uniq(client_ip) AS clients, any(rule_msg)
 		FROM traffic
 		ARRAY JOIN rule_ids AS rule_id, arrayResize(rule_msgs, length(rule_ids), '') AS rule_msg

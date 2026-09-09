@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/amzteodor/proxy-waf/internal/config"
-	"github.com/amzteodor/proxy-waf/internal/store"
+	"github.com/amzteodor/heron/internal/config"
+	"github.com/amzteodor/heron/internal/store"
 )
 
 // ListApps returns the apps the caller may see.
@@ -104,6 +104,9 @@ func validateApp(app *config.App) error {
 	if app.WAF.ParanoiaLevel < 0 || app.WAF.ParanoiaLevel > 4 {
 		return errors.New("waf.paranoia_level must be between 1 and 4")
 	}
+	if app.WAF.Mode != "" && !config.ValidMode(app.WAF.Mode) {
+		return errors.New("waf.mode must be detect or block")
+	}
 	if app.RetentionDays < 0 || app.RetentionDays > 3650 {
 		return errors.New("retention_days must be between 1 and 3650")
 	}
@@ -179,7 +182,7 @@ func (h *Handler) DownloadCertificateAuthority(w http.ResponseWriter, r *http.Re
 		return
 	}
 	w.Header().Set("Content-Type", "application/x-pem-file")
-	w.Header().Set("Content-Disposition", `attachment; filename="proxy-waf-ca.crt"`)
+	w.Header().Set("Content-Disposition", `attachment; filename="heron-ca.crt"`)
 	_, _ = w.Write([]byte(info.CertPEM))
 }
 
@@ -187,7 +190,7 @@ func (h *Handler) DownloadCertificateAuthority(w http.ResponseWriter, r *http.Re
 // trusted the old one stops trusting what the proxy serves, so it is a
 // deliberate, separate action.
 func (h *Handler) RegenerateCertificateAuthority(w http.ResponseWriter, r *http.Request) {
-	ca, err := h.Store.RegenerateCA(r.Context(), "proxy-waf")
+	ca, err := h.Store.RegenerateCA(r.Context(), "heron")
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return

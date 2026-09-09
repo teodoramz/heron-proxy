@@ -7,7 +7,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/amzteodor/proxy-waf/internal/pipeline/event"
+	"github.com/amzteodor/heron/internal/pipeline/event"
 )
 
 // Matcher evaluates a filter against events in memory, so the live tail applies
@@ -325,6 +325,8 @@ func boolField(e *event.Event, col string) bool {
 	switch col {
 	case "would_block":
 		return e.WouldBlock
+	case "blocked":
+		return e.Blocked
 	case "req_truncated":
 		return e.ReqTruncated
 	case "is_websocket":

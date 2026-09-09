@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: proxy
-  namespace: proxy-waf
+  namespace: heron
 spec:
   # One replica: the spool is a ReadWriteOnce volume, and v1 is a single node.
   # Scaling out requires the broker-backed sink.
@@ -16,9 +16,9 @@ spec:
     spec:
       containers:
         - name: proxy
-          image: proxy-waf/proxy:latest
+          image: heron/proxy:latest
           envFrom:
-            - secretRef: { name: proxy-waf }
+            - secretRef: { name: heron }
           env:
             - name: SPOOL_DIR
               value: /data/spool
@@ -52,13 +52,13 @@ spec:
         - name: blobs
           persistentVolumeClaim: { claimName: blobs }
         - name: rules
-          configMap: { name: proxy-waf-rules, optional: true }
+          configMap: { name: heron-rules, optional: true }
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: proxy
-  namespace: proxy-waf
+  namespace: heron
 spec:
   type: LoadBalancer
   selector: { app: proxy }
@@ -74,7 +74,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: proxy-admin
-  namespace: proxy-waf
+  namespace: heron
 spec:
   selector: { app: proxy }
   ports:
