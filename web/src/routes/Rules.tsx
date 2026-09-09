@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { humanize } from '../api/errors'
 import { api } from '../api/client'
 import { count } from '../components/format'
 import type { CrsRule, RuleFacets } from '../api/types'
@@ -24,7 +25,7 @@ export function Rules() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    api.ruleFacets().then(setFacets).catch((e) => setError(e.message))
+    api.ruleFacets().then(setFacets).catch((e) => setError(humanize(e.message)))
   }, [])
 
   // Reset to the first page whenever the search changes.
@@ -38,7 +39,7 @@ export function Rules() {
           setRules(r.rules ?? [])
           setMatched(r.total)
         })
-        .catch((e) => setError(e.message))
+        .catch((e) => setError(humanize(e.message)))
     }, 150) // debounce, so typing does not fire a request per keystroke
     return () => clearTimeout(timer)
   }, [text, tag, paranoia, severity, offset])

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { api } from '../api/client'
+import { humanize } from '../api/errors'
 import { DetailDrawer } from '../components/DetailDrawer'
 import { FilterBar } from '../components/FilterBar'
 import { Pager } from '../components/Pager'
@@ -114,7 +115,7 @@ export function Traffic() {
           })
         }
       })
-      .catch((e) => id === requestId.current && setError(e.message))
+      .catch((e) => id === requestId.current && setError(humanize(e.message)))
       .finally(() => {
         if (id !== requestId.current) return
         setLoading(false)

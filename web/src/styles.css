@@ -225,6 +225,13 @@ a:hover { text-decoration: underline; }
 .chip button:hover { color: var(--s5xx); }
 .chip-op { color: var(--accent); }
 
+.divider {
+  width: 1px;
+  align-self: stretch;
+  background: var(--line-strong);
+  margin: 0 2px;
+}
+
 .live-dot {
   width: 7px;
   height: 7px;

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { humanize } from '../api/errors'
 import { api, type VerdictSummary } from '../api/client'
 import { count } from '../components/format'
 import type { App, Exclusion, Filter, RuleStat, Simulation } from '../api/types'
@@ -47,7 +48,7 @@ export function Tuning() {
         setExclusions(e.exclusions ?? [])
         setLadder(sims)
       })
-      .catch((err) => setError(err.message))
+      .catch((err) => setError(humanize(err.message)))
   }, [appId, filter])
 
   useEffect(() => {

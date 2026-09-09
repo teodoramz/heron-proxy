@@ -16,7 +16,7 @@ export interface ColumnDef {
 const dim = () => 'cell-dim'
 
 export const COLUMNS: ColumnDef[] = [
-  { id: 'time', label: 'Time', width: '86px', value: (e) => clockTime(e.ts), className: dim },
+  { id: 'time', label: 'Time', width: '104px', value: (e) => clockTime(e.ts), className: dim },
   { id: 'date', label: 'Date', width: '84px', value: (e) => e.ts.slice(0, 10), className: dim },
   { id: 'app', label: 'App', width: '90px', value: (e) => e.app_id || '—', className: dim },
   { id: 'method', label: 'Method', width: '62px', value: (e) => e.method },
@@ -31,11 +31,11 @@ export const COLUMNS: ColumnDef[] = [
       e.req_body_preview || (e.req_body_size > 0 ? `(${e.req_body_size} bytes, not stored)` : '—'),
     className: (e) => (e.req_body_preview ? '' : 'cell-dim'),
   },
-  { id: 'client_ip', label: 'Source', width: '132px', value: (e) => e.client_ip },
+  { id: 'client_ip', label: 'Source', width: '150px', value: (e) => e.client_ip },
   {
     id: 'client_ip_claimed',
     label: 'Claimed source',
-    width: '132px',
+    width: '150px',
     value: (e) => (e.client_ip_claimed && e.client_ip_claimed !== '::' ? e.client_ip_claimed : '—'),
     className: dim,
   },
@@ -87,15 +87,15 @@ export const COLUMNS: ColumnDef[] = [
     value: (e) => (e.rule_tags?.length ? e.rule_tags.filter((t) => t.startsWith('attack-')).join(' ') || e.rule_tags.join(' ') : '—'),
     className: dim,
   },
-  { id: 'duration', label: 'Time', width: '72px', align: 'right', value: (e) => duration(e.duration_ms), className: dim },
+  { id: 'duration', label: 'Took', width: '78px', align: 'right', value: (e) => duration(e.duration_ms), className: dim },
   { id: 'upstream_ms', label: 'Upstream', width: '76px', align: 'right', value: (e) => duration(e.upstream_ms), className: dim },
   { id: 'waf_ms', label: 'WAF', width: '62px', align: 'right', value: (e) => duration(e.waf_ms), className: dim },
   { id: 'req_size', label: 'Req size', width: '76px', align: 'right', value: (e) => bytes(e.req_body_size), className: dim },
   { id: 'resp_size', label: 'Resp size', width: '80px', align: 'right', value: (e) => bytes(e.resp_size), className: dim },
   { id: 'content_type', label: 'Type', width: '130px', value: (e) => e.resp_content_type || '—', className: dim },
   { id: 'user_agent', label: 'User agent', width: 'minmax(200px, 2fr)', value: (e) => e.user_agent || '—', className: dim },
-  { id: 'ja4', label: 'JA4', width: '190px', value: (e) => e.ja4 || '—', className: dim },
-  { id: 'ja3', label: 'JA3', width: '190px', value: (e) => e.ja3 || '—', className: dim },
+  { id: 'ja4', label: 'JA4', width: '300px', value: (e) => e.ja4 || '—', className: dim },
+  { id: 'ja3', label: 'JA3', width: '260px', value: (e) => e.ja3 || '—', className: dim },
   { id: 'scheme', label: 'Scheme', width: '64px', value: (e) => e.scheme, className: dim },
   { id: 'http_version', label: 'Version', width: '76px', value: (e) => e.http_version, className: dim },
   { id: 'error', label: 'Error', width: 'minmax(140px, 1fr)', value: (e) => e.error || '—', className: (e) => (e.error ? 'status-5xx' : 'cell-dim') },
@@ -166,11 +166,11 @@ export function trackFor(c: ColumnDef, widths: Record<string, number>, mode: Wid
   if (w) return `${w}px`
   if (mode === 'fit') return c.width
 
-  // In full mode a fractional track becomes content-sized, with the same
-  // minimum and a ceiling so one enormous value cannot dominate the table.
-  const flexible = c.width.includes('fr')
-  if (!flexible) return c.width
-  const min = c.width.match(/minmax\((\d+)px/)?.[1] ?? '120'
+  // Full mode sizes every column to its content, not just the flexible ones:
+  // a fixed track such as the timestamp would otherwise keep truncating, which
+  // is the thing full mode exists to prevent. The declared width becomes the
+  // minimum so columns never collapse below a readable size.
+  const min = c.width.match(/minmax\((\d+)px/)?.[1] ?? c.width.match(/^(\d+)px$/)?.[1] ?? '80'
   return `minmax(${min}px, max-content)`
 }
 
