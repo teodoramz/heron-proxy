@@ -17,7 +17,14 @@ import (
 
 var (
 	baseTime = time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
-	testApps = []string{"api", "web"}
+
+	// Each run owns two app identifiers and filters on them. Sharing the table
+	// with other suites is then harmless, and nothing has to be truncated:
+	// TRUNCATE on the Atomic engine is deferred, so under load it can complete
+	// after the insert and take the fixture with it.
+	runID  = fmt.Sprintf("r%d", time.Now().UnixNano())
+	appAPI = runID + "-api"
+	appWeb = runID + "-web"
 )
 
 var testReader *Reader
@@ -38,26 +45,17 @@ func TestMain(m *testing.M) {
 	}
 	defer w.Close()
 
-	// The migrations are idempotent, so the fixture truncates rather than drops.
-	// Dropping is unreliable here: on the Atomic database engine a DROP is
-	// deferred, and a CREATE IF NOT EXISTS issued straight after can land rows
-	// in a table already queued for deletion.
 	if err := w.Migrate(ctx); err != nil {
 		fmt.Fprintf(os.Stderr, "migrate: %v\n", err)
 		os.Exit(1)
-	}
-	for _, table := range []string{"traffic", "traffic_stats_1m", "rule_hits_1h", "ip_stats_1h"} {
-		if err := w.Conn().Exec(ctx, "TRUNCATE TABLE IF EXISTS "+table); err != nil {
-			fmt.Fprintf(os.Stderr, "truncate %s: %v\n", table, err)
-			os.Exit(1)
-		}
 	}
 	if err := w.WriteBatch(ctx, fixtures()); err != nil {
 		fmt.Fprintf(os.Stderr, "seed: %v\n", err)
 		os.Exit(1)
 	}
 	var seeded uint64
-	if err := w.Conn().QueryRow(ctx, "SELECT count() FROM traffic").Scan(&seeded); err != nil {
+	if err := w.Conn().QueryRow(ctx,
+		"SELECT count() FROM traffic WHERE app_id IN (?, ?)", appAPI, appWeb).Scan(&seeded); err != nil {
 		fmt.Fprintf(os.Stderr, "verify seed: %v\n", err)
 		os.Exit(1)
 	}
@@ -92,7 +90,7 @@ func fixtures() []event.Event {
 	mk := func(i int, app, method, path string, status uint16, anomaly uint16, ip string, rules []uint32, tags []string, block bool) event.Event {
 		return event.Event{
 			TS:              baseTime.Add(time.Duration(i) * time.Minute),
-			ID:              uuid.NewSHA1(uuid.NameSpaceURL, []byte(fmt.Sprintf("event-%d", i))).String(),
+			ID:              uuid.NewSHA1(uuid.NameSpaceURL, []byte(fmt.Sprintf("%s-event-%d", runID, i))).String(),
 			AppID:           app,
 			RetentionDays:   90,
 			ClientIP:        netip.MustParseAddr(ip),
@@ -132,18 +130,20 @@ func fixtures() []event.Event {
 		}
 	}
 	return []event.Event{
-		mk(0, "api", "GET", "/v1/users", 200, 0, "203.0.113.1", nil, nil, false),
-		mk(1, "api", "POST", "/v1/login", 403, 15, "203.0.113.9", []uint32{942100, 949110}, []string{"attack-sqli"}, true),
-		mk(2, "api", "GET", "/v1/login", 404, 5, "203.0.113.9", []uint32{941100}, []string{"attack-xss"}, true),
-		mk(3, "web", "GET", "/index.html", 200, 0, "198.51.100.4", nil, nil, false),
-		mk(4, "web", "GET", "/admin", 500, 3, "198.51.100.4", []uint32{930120}, []string{"attack-lfi"}, false),
+		mk(0, appAPI, "GET", "/v1/users", 200, 0, "203.0.113.1", nil, nil, false),
+		mk(1, appAPI, "POST", "/v1/login", 403, 15, "203.0.113.9", []uint32{942100, 949110}, []string{"attack-sqli"}, true),
+		mk(2, appAPI, "GET", "/v1/login", 404, 5, "203.0.113.9", []uint32{941100}, []string{"attack-xss"}, true),
+		mk(3, appWeb, "GET", "/index.html", 200, 0, "198.51.100.4", nil, nil, false),
+		mk(4, appWeb, "GET", "/admin", 500, 3, "198.51.100.4", []uint32{930120}, []string{"attack-lfi"}, false),
 	}
 }
 
+// fullRange covers the fixture and nothing else.
 func fullRange() query.Filter {
 	return query.Filter{
 		From: baseTime.Add(-time.Hour),
 		To:   baseTime.Add(time.Hour),
+		Apps: []string{appAPI, appWeb},
 		Root: query.Group{Op: "and"},
 	}
 }
@@ -179,7 +179,7 @@ func TestListRoundTripsFields(t *testing.T) {
 		t.Fatalf("got %d events, want 1", len(page.Events))
 	}
 	e := page.Events[0]
-	if e.Method != "POST" || e.Host != "api.example" {
+	if e.Method != "POST" || e.Host != appAPI+".example" {
 		t.Errorf("request fields wrong: %+v", e)
 	}
 	if e.ClientIP.String() != "203.0.113.9" {
@@ -275,7 +275,7 @@ func TestCount(t *testing.T) {
 func TestAppScopeFilter(t *testing.T) {
 	r := newReader(t)
 	f := fullRange()
-	f.Apps = []string{"web"}
+	f.Apps = []string{appWeb}
 	page, err := r.List(context.Background(), f)
 	if err != nil {
 		t.Fatalf("List: %v", err)
@@ -284,7 +284,7 @@ func TestAppScopeFilter(t *testing.T) {
 		t.Fatalf("got %d events, want 2", len(page.Events))
 	}
 	for _, e := range page.Events {
-		if e.AppID != "web" {
+		if e.AppID != appWeb {
 			t.Errorf("app scope leaked: %s", e.AppID)
 		}
 	}

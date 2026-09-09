@@ -646,3 +646,74 @@ func TestValidatePEM(t *testing.T) {
 		t.Error("garbage accepted as PEM")
 	}
 }
+
+func TestCertificateAuthorityIsCreatedOnceAndReused(t *testing.T) {
+	s := newStore(t)
+	ctx := context.Background()
+
+	first, err := s.EnsureCA(ctx, "test authority")
+	if err != nil {
+		t.Fatalf("EnsureCA: %v", err)
+	}
+	second, err := s.EnsureCA(ctx, "test authority")
+	if err != nil {
+		t.Fatalf("second EnsureCA: %v", err)
+	}
+	if first.Fingerprint() != second.Fingerprint() {
+		t.Error("a second call generated a different authority")
+	}
+
+	info, err := s.CAInfo(ctx)
+	if err != nil {
+		t.Fatalf("CAInfo: %v", err)
+	}
+	if info.Fingerprint != first.Fingerprint() || info.CertPEM == "" {
+		t.Errorf("info does not match the authority: %+v", info)
+	}
+	if info.NotAfter.Before(time.Now().AddDate(5, 0, 0)) {
+		t.Errorf("authority expires %s, sooner than expected", info.NotAfter)
+	}
+}
+
+func TestCertificateAuthorityKeyIsEncryptedAtRest(t *testing.T) {
+	s := newStore(t)
+	ctx := context.Background()
+	ca, err := s.EnsureCA(ctx, "test authority")
+	if err != nil {
+		t.Fatal(err)
+	}
+	keyPEM, _ := ca.KeyPEM()
+
+	var raw []byte
+	if err := s.pool.QueryRow(ctx, `SELECT key_encrypted FROM certificate_authority`).Scan(&raw); err != nil {
+		t.Fatal(err)
+	}
+	if string(raw) == string(keyPEM) {
+		t.Error("the authority key was stored in cleartext")
+	}
+}
+
+func TestRegenerateCertificateAuthority(t *testing.T) {
+	s := newStore(t)
+	ctx := context.Background()
+
+	before, _ := s.EnsureCA(ctx, "test authority")
+	after, err := s.RegenerateCA(ctx, "test authority")
+	if err != nil {
+		t.Fatalf("RegenerateCA: %v", err)
+	}
+	if before.Fingerprint() == after.Fingerprint() {
+		t.Error("regenerating produced the same authority")
+	}
+	loaded, _ := s.LoadCA(ctx)
+	if loaded.Fingerprint() != after.Fingerprint() {
+		t.Error("the stored authority is not the regenerated one")
+	}
+}
+
+func TestCertificateAuthorityMissingBeforeCreation(t *testing.T) {
+	s := newStore(t)
+	if _, err := s.LoadCA(context.Background()); !errors.Is(err, ErrNotFound) {
+		t.Errorf("err = %v, want ErrNotFound", err)
+	}
+}

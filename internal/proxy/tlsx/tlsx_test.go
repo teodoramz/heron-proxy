@@ -88,6 +88,15 @@ func TestCertStoreExactBeatsWildcard(t *testing.T) {
 	}
 }
 
+func TestUploadedCertificateIsNotASilentCatchAll(t *testing.T) {
+	s := NewCertStore()
+	s.Replace([]Cert{{Names: []string{"one.example"}, Cert: genCert(t, "one.example")}})
+
+	if _, err := s.GetCertificate(&tls.ClientHelloInfo{ServerName: "other.example"}); err == nil {
+		t.Error("a certificate for one host was served for another")
+	}
+}
+
 func TestCertStoreDefaultFallback(t *testing.T) {
 	s := NewCertStore()
 	a, d := genCert(t, "a.example"), genCert(t, "default.example")
@@ -221,5 +230,139 @@ func TestNonTLSBytesAreReplayedIntact(t *testing.T) {
 	}
 	if fp := conn.(*Conn).Fingerprint(); fp.JA3 != "" {
 		t.Errorf("non-TLS traffic produced a fingerprint: %+v", fp)
+	}
+}
+
+func TestCAMintsForAnyName(t *testing.T) {
+	ca, err := NewCA("proxy-waf test authority")
+	if err != nil {
+		t.Fatalf("NewCA: %v", err)
+	}
+	leaf, err := ca.Leaf("anything.example")
+	if err != nil {
+		t.Fatalf("Leaf: %v", err)
+	}
+	if leaf.Leaf.Subject.CommonName != "anything.example" {
+		t.Errorf("common name = %q", leaf.Leaf.Subject.CommonName)
+	}
+	if len(leaf.Certificate) != 2 {
+		t.Errorf("chain has %d certificates, want the leaf and the authority", len(leaf.Certificate))
+	}
+}
+
+func TestCAVerifiesAgainstItself(t *testing.T) {
+	ca, _ := NewCA("proxy-waf test authority")
+	leaf, err := ca.Leaf("verify.example")
+	if err != nil {
+		t.Fatal(err)
+	}
+	pool := x509.NewCertPool()
+	if !pool.AppendCertsFromPEM([]byte(ca.CertPEM())) {
+		t.Fatal("authority PEM did not parse")
+	}
+	if _, err := leaf.Leaf.Verify(x509.VerifyOptions{DNSName: "verify.example", Roots: pool}); err != nil {
+		t.Errorf("a client trusting the authority could not verify the leaf: %v", err)
+	}
+}
+
+func TestCACachesPerName(t *testing.T) {
+	ca, _ := NewCA("proxy-waf test authority")
+	first, _ := ca.Leaf("cache.example")
+	second, _ := ca.Leaf("CACHE.example.")
+	if first != second {
+		t.Error("the same name was signed twice")
+	}
+	if ca.Minted() != 1 {
+		t.Errorf("minted %d certificates for one name", ca.Minted())
+	}
+	ca.Leaf("other.example")
+	if ca.Minted() != 2 {
+		t.Errorf("minted = %d, want 2", ca.Minted())
+	}
+}
+
+func TestCARoundTripsThroughPEM(t *testing.T) {
+	original, _ := NewCA("proxy-waf test authority")
+	keyPEM, err := original.KeyPEM()
+	if err != nil {
+		t.Fatal(err)
+	}
+	restored, err := LoadCA(original.CertPEM(), keyPEM)
+	if err != nil {
+		t.Fatalf("LoadCA: %v", err)
+	}
+	if restored.Fingerprint() != original.Fingerprint() {
+		t.Error("the restored authority is a different certificate")
+	}
+	// A leaf from the restored authority must still chain to the original.
+	leaf, _ := restored.Leaf("restored.example")
+	pool := x509.NewCertPool()
+	pool.AppendCertsFromPEM([]byte(original.CertPEM()))
+	if _, err := leaf.Leaf.Verify(x509.VerifyOptions{DNSName: "restored.example", Roots: pool}); err != nil {
+		t.Errorf("leaf does not chain to the original authority: %v", err)
+	}
+}
+
+func TestCertStoreFallsBackToTheAuthority(t *testing.T) {
+	s := NewCertStore()
+	uploaded := genCert(t, "uploaded.example")
+	s.Replace([]Cert{{Names: []string{"uploaded.example"}, Cert: uploaded}})
+
+	// With no authority and no certificate marked as the catch-all, an unknown
+	// name fails rather than being served someone else's certificate.
+	if _, err := s.GetCertificate(&tls.ClientHelloInfo{ServerName: "unknown.example"}); err == nil {
+		t.Fatal("an unknown name resolved with no authority installed")
+	}
+
+	ca, _ := NewCA("proxy-waf test authority")
+	s.SetCA(ca)
+
+	got, err := s.GetCertificate(&tls.ClientHelloInfo{ServerName: "unknown.example"})
+	if err != nil {
+		t.Fatalf("GetCertificate: %v", err)
+	}
+	if got.Leaf.Subject.CommonName != "unknown.example" {
+		t.Errorf("minted for %q", got.Leaf.Subject.CommonName)
+	}
+
+	// An uploaded certificate must still win over the authority.
+	got, _ = s.GetCertificate(&tls.ClientHelloInfo{ServerName: "uploaded.example"})
+	if got != uploaded {
+		t.Error("the authority overrode an uploaded certificate")
+	}
+}
+
+// TestHandshakeWithMintedCertificate is the point of the authority: a client
+// that trusts it can complete a handshake for a name nobody uploaded.
+func TestHandshakeWithMintedCertificate(t *testing.T) {
+	store := NewCertStore()
+	ca, _ := NewCA("proxy-waf test authority")
+	store.SetCA(ca)
+
+	raw, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer raw.Close()
+
+	srv := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})}
+	defer srv.Close()
+	go srv.Serve(tls.NewListener(NewListener(raw), &tls.Config{GetCertificate: store.GetCertificate}))
+
+	pool := x509.NewCertPool()
+	pool.AppendCertsFromPEM([]byte(ca.CertPEM()))
+	client := &http.Client{Transport: &http.Transport{
+		TLSClientConfig: &tls.Config{RootCAs: pool, ServerName: "never-uploaded.example"},
+	}}
+
+	resp, err := client.Get("https://" + raw.Addr().String() + "/")
+	if err != nil {
+		t.Fatalf("handshake with a minted certificate failed: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNoContent {
+		t.Errorf("status = %d", resp.StatusCode)
 	}
 }

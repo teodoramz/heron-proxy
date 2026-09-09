@@ -268,3 +268,11 @@ export interface RuleFacets {
   categories: string[]
   severities: string[]
 }
+
+export interface CertificateAuthority {
+  cert_pem: string
+  fingerprint: string
+  not_after: string
+  created_at: string
+  expires_in_days: number
+}

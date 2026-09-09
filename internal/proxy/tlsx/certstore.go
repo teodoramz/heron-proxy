@@ -25,8 +25,13 @@ type certMap struct {
 }
 
 // CertStore resolves certificates by SNI and can be replaced atomically.
+//
+// An uploaded certificate always wins. When none matches, the store falls back
+// to the authority and mints one for the name asked for, so an application can
+// be proxied without preparing a certificate first.
 type CertStore struct {
-	m atomic.Pointer[certMap]
+	m  atomic.Pointer[certMap]
+	ca atomic.Pointer[CA]
 }
 
 // NewCertStore returns an empty store.
@@ -57,12 +62,21 @@ func (s *CertStore) Replace(certs []Cert) {
 				m.exact[name] = c.Cert
 			}
 		}
-		if c.Default || m.fallback == nil {
+		// Only an explicit choice becomes the catch-all. Treating the first
+		// uploaded certificate as one silently served a wrong-name certificate
+		// to every other host.
+		if c.Default {
 			m.fallback = c.Cert
 		}
 	}
 	s.m.Store(m)
 }
+
+// SetCA installs the authority used when nothing else matches.
+func (s *CertStore) SetCA(ca *CA) { s.ca.Store(ca) }
+
+// CA returns the installed authority, if any.
+func (s *CertStore) CA() *CA { return s.ca.Load() }
 
 // GetCertificate satisfies tls.Config.GetCertificate.
 func (s *CertStore) GetCertificate(chi *tls.ClientHelloInfo) (*tls.Certificate, error) {
@@ -75,6 +89,18 @@ func (s *CertStore) GetCertificate(chi *tls.ClientHelloInfo) (*tls.Certificate, 
 	if _, parent, found := strings.Cut(name, "."); found {
 		if c, ok := m.wildcard[parent]; ok {
 			return c, nil
+		}
+	}
+	// Mint one rather than failing the handshake. A client that trusts the
+	// authority sees a valid certificate; one that does not sees a warning,
+	// which is the honest result of intercepting the connection.
+	//
+	// This comes before the explicit catch-all deliberately: a certificate
+	// carrying the name that was asked for is better than a valid certificate
+	// for some other name.
+	if ca := s.ca.Load(); ca != nil && name != "" {
+		if leaf, err := ca.Leaf(name); err == nil {
+			return leaf, nil
 		}
 	}
 	if m.fallback != nil {

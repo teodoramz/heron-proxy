@@ -1,7 +1,7 @@
 import type {
   AlertRule, App, Certificate, EventDetail, Exclusion, FieldSchema, Filter,
   GroupStat, IPStat, Page, RuleStat, SavedFilter, SeriesPoint, Simulation,
-  RuleFacets, CrsRule, Summary, User,
+  RuleFacets, CrsRule, CertificateAuthority, Summary, User,
 } from './types'
 
 export class ApiError extends Error {
@@ -83,6 +83,9 @@ export const api = {
   apps: () => request<{ apps: App[] }>('/api/apps'),
   saveApp: (app: Partial<App>) => post<App>('/api/apps', app),
   deleteApp: (id: string) => request<void>(`/api/apps/${id}`, { method: 'DELETE' }),
+
+  certificateAuthority: () => request<CertificateAuthority>('/api/ca'),
+  regenerateCertificateAuthority: () => post<{ fingerprint: string }>('/api/ca/regenerate'),
 
   certificates: () => request<{ certificates: Certificate[] }>('/api/certificates'),
   saveCertificate: (body: { app_id: string; cert_pem: string; private_key_pem: string; is_default: boolean }) =>

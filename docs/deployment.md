@@ -36,9 +36,44 @@ database; together they are equivalent to holding the private keys.
 
 ## TLS
 
-The proxy terminates TLS itself using certificates you upload in the UI, matched
-by SNI with wildcard support and a default fallback. Certificate changes apply
-within one poll interval, without a restart.
+The proxy terminates TLS itself. For each connection it resolves a certificate
+by SNI, in this order:
+
+1. A certificate you uploaded whose names match exactly.
+2. An uploaded wildcard certificate covering the parent domain.
+3. One minted on the spot by the proxy's own certificate authority, carrying the
+   name the client asked for.
+4. A certificate you explicitly marked as the catch-all.
+
+Certificate changes apply within one poll interval, without a restart.
+
+### The certificate authority
+
+An application works before anyone prepares a certificate for it: the authority
+signs one for whatever name arrives. Install the authority certificate,
+downloadable from **Applications** or at `/api/ca.crt`, wherever you want those
+sites to load without a warning. Leave it uninstalled and browsers will warn —
+which is the correct thing for a proxy that reads the traffic.
+
+The authority's private key is encrypted at rest with `ENCRYPTION_KEY`, like any
+uploaded certificate. Replacing it invalidates every client that trusted the old
+one, so it is a separate, deliberate action.
+
+An uploaded certificate is never used as a silent catch-all: serving one host's
+certificate for another only produces name-mismatch warnings. Mark one as the
+catch-all explicitly if you want that behaviour.
+
+### Reaching your application
+
+What the proxy speaks to your application is decided by the app's upstream URL,
+independently of what the client used. An `https://` upstream is contacted over
+TLS, an `http://` one in plaintext, so a client can use HTTPS while the
+application behind stays plaintext. Either way the application is told what the
+client actually used, through `X-Forwarded-Proto`, so it can still build correct
+links and set secure cookies.
+
+Set `upstream_tls_verify` to false for an application with a self-signed
+certificate.
 
 Put nothing that terminates TLS in front of it. If a load balancer must sit in
 front, run it in TCP passthrough mode — otherwise the ClientHello never reaches

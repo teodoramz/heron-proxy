@@ -34,6 +34,9 @@ let it do anything.
 - **Records every request** — method, path, query, all headers, and the request
   body up to a configurable cap. Response status, headers and size are kept;
   response bodies are never read.
+- **Works before you prepare anything** — an application with no certificate is
+  served one minted by the proxy's own authority, carrying the name the client
+  asked for. Upload a real certificate whenever you have one.
 - **Detects without blocking** — OWASP CRS 4 through [Coraza](https://coraza.io),
   always in `DetectionOnly`. Each event carries the rules that fired, the anomaly
   score, and whether CRS would have blocked it.

@@ -20,6 +20,7 @@ type ConfigSource interface {
 	ListApps(ctx context.Context) ([]config.App, error)
 	ExclusionRules(ctx context.Context, appID string) ([]string, error)
 	LoadTLSCertificates(ctx context.Context) ([]tlsx.Cert, error)
+	EnsureCA(ctx context.Context, name string) (*tlsx.CA, error)
 }
 
 // Loader keeps the router, certificate store and WAF engine in step with the
@@ -64,6 +65,17 @@ func (l *Loader) Load(ctx context.Context) error {
 	certs, err := l.src.LoadTLSCertificates(ctx)
 	if err != nil {
 		return err
+	}
+	// The authority signs for hosts with no uploaded certificate, so a new
+	// application works before anyone prepares one.
+	if l.certs.CA() == nil {
+		ca, err := l.src.EnsureCA(ctx, "proxy-waf")
+		if err != nil {
+			l.log.Warn("certificate authority unavailable; hosts without an uploaded certificate will fail", "err", err)
+		} else {
+			l.certs.SetCA(ca)
+			l.log.Info("certificate authority ready", "fingerprint", ca.Fingerprint()[:16])
+		}
 	}
 
 	l.router.Replace(apps)

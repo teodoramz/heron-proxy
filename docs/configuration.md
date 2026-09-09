@@ -61,7 +61,7 @@ Set in the UI, stored in Postgres, applied by the proxy on its next poll.
 | --- | --- |
 | `hostnames` | Exact names or one wildcard label, `*.example.com`. An exact match wins. |
 | `upstream_url` | Absolute `http` or `https` URL. Any reachable host. |
-| `upstream_tls_verify` | Verify the upstream certificate. Off for self-signed internal services. |
+| `upstream_tls_verify` | Verify the upstream certificate. Off for self-signed internal services. The scheme of `upstream_url` decides whether TLS is used at all. |
 | `preserve_host` | Send the client's `Host` upstream instead of the upstream's own. |
 | `client_ip_header` | Header carrying the real client address. Default `X-Real-IP`. |
 | `trusted_cidrs` | Ranges whose `X-Forwarded-For` is believed. Empty means trust none. |

@@ -579,3 +579,73 @@ func TestWebSocketRelay(t *testing.T) {
 		t.Errorf("Status = %d, want 101", e.Status)
 	}
 }
+
+// TestUpstreamSchemeDecidesTransport checks the other half of termination: the
+// proxy speaks whatever the upstream URL says, so an application behind TLS is
+// reached over TLS and a plaintext one over plaintext, per app.
+func TestUpstreamSchemeDecidesTransport(t *testing.T) {
+	sawTLS := make(chan bool, 2)
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		sawTLS <- r.TLS != nil
+		w.WriteHeader(http.StatusOK)
+	})
+
+	// A TLS upstream, with verification off as a self-signed one requires.
+	secure := httptest.NewTLSServer(handler)
+	defer secure.Close()
+
+	h := newHarness(t, handler, func(a *config.App) {
+		a.UpstreamURL = secure.URL
+		a.UpstreamTLSVerify = false
+	})
+	h.get(t, "/over-tls").Body.Close()
+
+	select {
+	case tlsUsed := <-sawTLS:
+		if !tlsUsed {
+			t.Error("an https upstream was contacted without TLS")
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("the TLS upstream was never reached")
+	}
+
+	// The default harness upstream is plaintext.
+	plain := newHarness(t, handler, nil)
+	plain.get(t, "/plain").Body.Close()
+
+	select {
+	case tlsUsed := <-sawTLS:
+		if tlsUsed {
+			t.Error("an http upstream was contacted over TLS")
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("the plaintext upstream was never reached")
+	}
+}
+
+// TestTLSTerminationIsIndependentOfTheUpstream is the stripping case: the
+// client speaks TLS to the proxy while the application behind it does not.
+func TestTLSTerminationIsIndependentOfTheUpstream(t *testing.T) {
+	seen := make(chan *http.Request, 1)
+	h := newHarness(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seen <- r.Clone(r.Context())
+		w.WriteHeader(http.StatusOK)
+	}), nil)
+
+	h.get(t, "/downgrade").Body.Close()
+
+	select {
+	case got := <-seen:
+		if got.TLS != nil {
+			t.Error("the plaintext upstream received a TLS connection")
+		}
+		// The application is told what the client actually used, so it can still
+		// build correct links and set secure cookies.
+		if got.Header.Get("X-Forwarded-Proto") == "" {
+			t.Error("the upstream was not told which scheme the client used")
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("the upstream was never reached")
+	}
+}

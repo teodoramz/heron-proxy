@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api } from '../api/client'
-import type { App, Certificate } from '../api/types'
+import type { App, CertificateAuthority, Certificate } from '../api/types'
 
 const BLANK = {
   id: '',
@@ -19,6 +19,7 @@ const BLANK = {
 export function Apps() {
   const [apps, setApps] = useState<App[]>([])
   const [certs, setCerts] = useState<Certificate[]>([])
+  const [ca, setCA] = useState<CertificateAuthority>()
   const [form, setForm] = useState({ ...BLANK })
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -26,6 +27,7 @@ export function Apps() {
   const reload = useCallback(() => {
     api.apps().then((r) => setApps(r.apps ?? [])).catch((e) => setError(e.message))
     api.certificates().then((r) => setCerts(r.certificates ?? [])).catch(() => setCerts([]))
+    api.certificateAuthority().then(setCA).catch(() => setCA(undefined))
   }, [])
 
   useEffect(reload, [reload])
@@ -64,6 +66,52 @@ export function Apps() {
       <div className="page-body">
         {error && <p className="error-msg">{error}</p>}
         {notice && <p className="muted">{notice}</p>}
+
+        <section className="panel">
+          <div className="panel-head">
+            <h2>Certificate authority</h2>
+            {ca && <span className="muted mono">expires in {ca.expires_in_days} days</span>}
+          </div>
+          <div className="panel-body">
+            <p className="hint" style={{ marginTop: 0 }}>
+              Applications with no certificate of their own are served one signed here, minted for
+              whatever name the client asked for. Install this certificate as trusted and those
+              sites load without a warning; leave it uninstalled and browsers will warn, which is
+              the honest result of a proxy reading the traffic.
+            </p>
+            {ca ? (
+              <div className="row" style={{ gap: 10, flexWrap: 'wrap' }}>
+                <a className="btn btn-sm" href="/api/ca.crt" download>
+                  Download the certificate
+                </a>
+                <span className="muted mono" title={ca.fingerprint}>
+                  {ca.fingerprint.slice(0, 32)}…
+                </span>
+                <span className="spacer" />
+                <button
+                  className="btn btn-sm btn-danger"
+                  onClick={() => {
+                    if (
+                      !confirm(
+                        'Replacing the authority means every client that trusted the old one will ' +
+                          'warn until the new certificate is installed. Continue?',
+                      )
+                    )
+                      return
+                    api.regenerateCertificateAuthority().then(() => {
+                      api.certificateAuthority().then(setCA)
+                      setNotice('A new authority was generated. Install it wherever the old one was trusted.')
+                    })
+                  }}
+                >
+                  Replace
+                </button>
+              </div>
+            ) : (
+              <p className="muted">Not available.</p>
+            )}
+          </div>
+        </section>
 
         <section className="panel">
           <div className="panel-head">
@@ -192,7 +240,8 @@ export function Apps() {
             <div className="panel-body">
               {certs.length === 0 ? (
                 <p className="muted">
-                  No certificates loaded. The proxy needs one per hostname it terminates TLS for.
+                  None uploaded. Hosts without one are served a certificate signed by the authority
+                  above, so they work either way; upload one here to serve the real thing.
                 </p>
               ) : (
                 <table className="data">

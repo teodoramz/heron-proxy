@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/amzteodor/proxy-waf/internal/config"
 	"github.com/amzteodor/proxy-waf/internal/store"
@@ -141,6 +142,61 @@ func (h *Handler) ListCertificates(w http.ResponseWriter, r *http.Request) {
 		out = append(out, row{Certificate: c, ExpiresInDays: int(c.ExpiresIn().Hours() / 24)})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"certificates": out})
+}
+
+// CertificateAuthority returns the authority that signs for hosts with no
+// uploaded certificate, so it can be installed as trusted.
+func (h *Handler) CertificateAuthority(w http.ResponseWriter, r *http.Request) {
+	if _, err := h.Store.EnsureCA(r.Context(), "proxy-waf"); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	info, err := h.Store.CAInfo(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	type response struct {
+		store.CAInfo
+		ExpiresInDays int `json:"expires_in_days"`
+	}
+	writeJSON(w, http.StatusOK, response{
+		CAInfo:        info,
+		ExpiresInDays: int(time.Until(info.NotAfter).Hours() / 24),
+	})
+}
+
+// DownloadCertificateAuthority serves the authority certificate as a file, for
+// installing in a browser or system trust store.
+func (h *Handler) DownloadCertificateAuthority(w http.ResponseWriter, r *http.Request) {
+	if _, err := h.Store.EnsureCA(r.Context(), "proxy-waf"); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	info, err := h.Store.CAInfo(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	w.Header().Set("Content-Type", "application/x-pem-file")
+	w.Header().Set("Content-Disposition", `attachment; filename="proxy-waf-ca.crt"`)
+	_, _ = w.Write([]byte(info.CertPEM))
+}
+
+// RegenerateCertificateAuthority replaces the authority. Everything that
+// trusted the old one stops trusting what the proxy serves, so it is a
+// deliberate, separate action.
+func (h *Handler) RegenerateCertificateAuthority(w http.ResponseWriter, r *http.Request) {
+	ca, err := h.Store.RegenerateCA(r.Context(), "proxy-waf")
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	h.audit(r, "certificate_authority.regenerate", map[string]any{"fingerprint": ca.Fingerprint()})
+	writeJSON(w, http.StatusOK, map[string]any{
+		"fingerprint": ca.Fingerprint(),
+		"cert_pem":    ca.CertPEM(),
+	})
 }
 
 // SaveCertificate stores a key pair, encrypting the private key.

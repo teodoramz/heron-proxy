@@ -103,6 +103,12 @@ func NewRouter(o Options) http.Handler {
 	mux.Handle("POST /api/apps", admin(http.HandlerFunc(h.SaveApp)))
 	mux.Handle("PUT /api/apps/{id}", admin(http.HandlerFunc(h.SaveApp)))
 	mux.Handle("DELETE /api/apps/{id}", admin(http.HandlerFunc(h.DeleteApp)))
+	// The authority certificate is public by nature: it is meant to be
+	// installed as trusted, and holds no secret.
+	mux.Handle("GET /api/ca", viewer(http.HandlerFunc(h.CertificateAuthority)))
+	mux.Handle("GET /api/ca.crt", viewer(http.HandlerFunc(h.DownloadCertificateAuthority)))
+	mux.Handle("POST /api/ca/regenerate", admin(http.HandlerFunc(h.RegenerateCertificateAuthority)))
+
 	mux.Handle("GET /api/certificates", admin(http.HandlerFunc(h.ListCertificates)))
 	mux.Handle("POST /api/certificates", admin(http.HandlerFunc(h.SaveCertificate)))
 	mux.Handle("DELETE /api/certificates/{id}", admin(http.HandlerFunc(h.DeleteCertificate)))
