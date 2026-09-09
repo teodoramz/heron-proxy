@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api/client'
 import { ColumnPicker } from './ColumnPicker'
+import type { WidthMode } from './columns'
 import type { Condition, FieldSchema, Filter, Op } from '../api/types'
 
 interface Props {
@@ -11,6 +12,8 @@ interface Props {
   onToggleLive: () => void
   columns: string[]
   onColumnsChange: (ids: string[]) => void
+  widthMode: WidthMode
+  onToggleWidthMode: () => void
   autoRefresh: boolean
   onToggleAutoRefresh: () => void
   onRefresh: () => void
@@ -35,6 +38,8 @@ export function FilterBar({
   onToggleLive,
   columns,
   onColumnsChange,
+  widthMode,
+  onToggleWidthMode,
   autoRefresh,
   onToggleAutoRefresh,
   onRefresh,
@@ -184,6 +189,20 @@ export function FilterBar({
         >
           <span className={`live-dot ${live ? (liveConnected ? 'on' : 'pending') : ''}`} />{' '}
           {live ? (liveConnected ? 'Live' : 'Connecting') : 'Live'}
+        </button>
+
+        <button
+          type="button"
+          className="btn btn-sm"
+          onClick={onToggleWidthMode}
+          aria-pressed={widthMode === 'full'}
+          title={
+            widthMode === 'fit'
+              ? 'Let columns take the width their content needs, and scroll sideways'
+              : 'Fit every column into the window'
+          }
+        >
+          {widthMode === 'fit' ? 'Fit width' : 'Full width'}
         </button>
 
         <ColumnPicker selected={columns} onChange={onColumnsChange} />

@@ -27,6 +27,7 @@ func (h *Handler) ListTraffic(w http.ResponseWriter, r *http.Request) {
 	if !session(r).User.Role.AtLeast(store.RoleAnalyst) {
 		for i := range page.Events {
 			page.Events[i].ReqBody = ""
+			page.Events[i].ReqBodyPreview = ""
 		}
 	}
 	writeJSON(w, http.StatusOK, page)
@@ -94,6 +95,7 @@ func (h *Handler) GetTraffic(w http.ResponseWriter, r *http.Request) {
 		detail.Body, detail.BodySource = h.loadBody(e)
 	} else {
 		detail.Event.ReqBody = ""
+		detail.Event.ReqBodyPreview = ""
 	}
 
 	if marks, err := h.Store.FPMarksForEvents(r.Context(), []string{id}); err == nil {

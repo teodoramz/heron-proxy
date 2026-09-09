@@ -23,6 +23,14 @@ export const COLUMNS: ColumnDef[] = [
   { id: 'host', label: 'Host', width: '150px', value: (e) => e.host },
   { id: 'path', label: 'Path', width: 'minmax(220px, 2fr)', value: (e) => e.path },
   { id: 'query', label: 'Query', width: 'minmax(140px, 1fr)', value: (e) => e.query || '—', className: dim },
+  {
+    id: 'body',
+    label: 'Request body',
+    width: 'minmax(220px, 2fr)',
+    value: (e) =>
+      e.req_body_preview || (e.req_body_size > 0 ? `(${e.req_body_size} bytes, not stored)` : '—'),
+    className: (e) => (e.req_body_preview ? '' : 'cell-dim'),
+  },
   { id: 'client_ip', label: 'Source', width: '132px', value: (e) => e.client_ip },
   {
     id: 'client_ip_claimed',
@@ -97,7 +105,7 @@ export const COLUMNS_BY_ID = new Map(COLUMNS.map((c) => [c.id, c]))
 
 /** The columns shown before anyone changes anything. */
 export const DEFAULT_COLUMNS = [
-  'time', 'app', 'method', 'host', 'path', 'client_ip', 'status', 'anomaly', 'duration', 'rules',
+  'time', 'app', 'method', 'host', 'path', 'body', 'client_ip', 'status', 'anomaly', 'rules',
 ]
 
 const STORAGE_KEY = 'pw-columns'
@@ -143,8 +151,39 @@ export function saveWidths(widths: Record<string, number>): void {
   }
 }
 
-/** trackFor returns the grid track for a column, honouring a dragged width. */
-export function trackFor(c: ColumnDef, widths: Record<string, number>): string {
+/** How the table sizes its columns. */
+export type WidthMode = 'fit' | 'full'
+
+/**
+ * trackFor returns the grid track for a column.
+ *
+ * A width the person dragged always wins. Otherwise "fit" shares the window
+ * between the flexible columns, and "full" lets each column take the width its
+ * content needs, so the table becomes wider than the window and scrolls.
+ */
+export function trackFor(c: ColumnDef, widths: Record<string, number>, mode: WidthMode): string {
   const w = widths[c.id]
-  return w ? `${w}px` : c.width
+  if (w) return `${w}px`
+  if (mode === 'fit') return c.width
+
+  // In full mode a fractional track becomes content-sized, with the same
+  // minimum and a ceiling so one enormous value cannot dominate the table.
+  const flexible = c.width.includes('fr')
+  if (!flexible) return c.width
+  const min = c.width.match(/minmax\((\d+)px/)?.[1] ?? '120'
+  return `minmax(${min}px, max-content)`
+}
+
+const MODE_KEY = 'pw-width-mode'
+
+export function loadWidthMode(): WidthMode {
+  return localStorage.getItem(MODE_KEY) === 'full' ? 'full' : 'fit'
+}
+
+export function saveWidthMode(mode: WidthMode): void {
+  try {
+    localStorage.setItem(MODE_KEY, mode)
+  } catch {
+    // A browser with storage blocked simply loses the preference.
+  }
 }

@@ -630,6 +630,10 @@ table.data td.num { text-align: right; }
 
 /* ---------- pager ---------- */
 
+/* Press and drag the table to pan it sideways. */
+.pannable { cursor: grab; }
+.pannable:active { cursor: grabbing; }
+
 .pager {
   display: flex;
   align-items: center;

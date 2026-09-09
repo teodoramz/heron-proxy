@@ -29,6 +29,7 @@ export interface TrafficEvent {
   req_headers?: Record<string, string>
   req_body_size: number
   req_body_inline?: string
+  req_body_preview?: string
   req_body_sha256?: string
   req_body_blob?: string
   req_truncated: boolean

@@ -1,6 +1,6 @@
 import { useCallback, useLayoutEffect, useRef, useState } from 'react'
 import type { TrafficEvent } from '../api/types'
-import { COLUMNS_BY_ID, trackFor, type ColumnDef } from './columns'
+import { COLUMNS_BY_ID, trackFor, type ColumnDef, type WidthMode } from './columns'
 import { anomalyLevel } from './format'
 
 const ROW_HEIGHT = 30
@@ -11,11 +11,15 @@ interface Props {
   events: TrafficEvent[]
   columns: string[]
   widths: Record<string, number>
+  widthMode: WidthMode
   onResize: (id: string, width: number) => void
   selectedId?: string
   loading: boolean
   onSelect: (e: TrafficEvent) => void
 }
+
+/** Movement beyond this many pixels counts as a drag rather than a click. */
+const DRAG_SLOP = 5
 
 /**
  * TrafficTable renders only the rows in view, so a large page stays responsive.
@@ -26,6 +30,7 @@ export function TrafficTable({
   events,
   columns,
   widths,
+  widthMode,
   onResize,
   selectedId,
   loading,
@@ -33,10 +38,59 @@ export function TrafficTable({
 }: Props) {
   const viewport = useRef<HTMLDivElement>(null)
   const [range, setRange] = useState({ start: 0, end: 60 })
+  const dragged = useRef(false)
 
   const defs = columns.map((id) => COLUMNS_BY_ID.get(id)).filter(Boolean) as ColumnDef[]
   // The leading 4px track is the anomaly gutter.
-  const template = `4px ${defs.map((c) => trackFor(c, widths)).join(' ')}`
+  const template = `4px ${defs.map((c) => trackFor(c, widths, widthMode)).join(' ')}`
+
+  // Press and drag anywhere on the table to pan sideways, so a wide row can be
+  // read without reaching for the scrollbar. A press that does not move is
+  // still a click, and opens the row.
+  const startPan = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    const el = viewport.current
+    if (!el || e.button !== 0) return
+    if ((e.target as HTMLElement).classList.contains('th-resize')) return
+
+    const startX = e.clientX
+    const startY = e.clientY
+    const startLeft = el.scrollLeft
+    const startTop = el.scrollTop
+    dragged.current = false
+
+    function move(ev: PointerEvent) {
+      const dx = ev.clientX - startX
+      const dy = ev.clientY - startY
+      if (!dragged.current && Math.abs(dx) + Math.abs(dy) < DRAG_SLOP) return
+      dragged.current = true
+      el!.scrollLeft = startLeft - dx
+      el!.scrollTop = startTop - dy
+      document.body.style.cursor = 'grabbing'
+      document.body.style.userSelect = 'none'
+    }
+    function done() {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', done)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', done)
+  }, [])
+
+  // A wheel with shift held scrolls sideways, which is the other way people expect.
+  const onWheel = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
+    if (!e.shiftKey || !viewport.current) return
+    viewport.current.scrollLeft += e.deltaY
+  }, [])
+
+  const select = useCallback(
+    (e: TrafficEvent) => {
+      if (dragged.current) return // the pointer was panning, not choosing a row
+      onSelect(e)
+    },
+    [onSelect],
+  )
 
   const recompute = useCallback(() => {
     const el = viewport.current
@@ -68,7 +122,13 @@ export function TrafficTable({
   const slice = events.slice(range.start, range.end)
 
   return (
-    <div className="table-wrap" ref={viewport} onScroll={recompute}>
+    <div
+      className="table-wrap pannable"
+      ref={viewport}
+      onScroll={recompute}
+      onPointerDown={startPan}
+      onWheel={onWheel}
+    >
       <div className="table-inner">
         <Header defs={defs} template={template} widths={widths} onResize={onResize} />
         <div style={{ height: range.start * ROW_HEIGHT }} />
@@ -79,7 +139,7 @@ export function TrafficTable({
             defs={defs}
             template={template}
             selected={e.id === selectedId}
-            onSelect={onSelect}
+            onSelect={select}
           />
         ))}
         <div style={{ height: Math.max(0, (events.length - range.end) * ROW_HEIGHT) }} />

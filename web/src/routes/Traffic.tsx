@@ -5,7 +5,15 @@ import { DetailDrawer } from '../components/DetailDrawer'
 import { FilterBar } from '../components/FilterBar'
 import { Pager } from '../components/Pager'
 import { TrafficTable } from '../components/TrafficTable'
-import { loadColumns, loadWidths, saveColumns, saveWidths } from '../components/columns'
+import {
+  loadColumns,
+  loadWidthMode,
+  loadWidths,
+  saveColumns,
+  saveWidthMode,
+  saveWidths,
+  type WidthMode,
+} from '../components/columns'
 import { useLiveTail } from '../hooks/useLiveTail'
 import type { Filter, TrafficEvent } from '../api/types'
 
@@ -44,6 +52,7 @@ export function Traffic() {
   const [error, setError] = useState('')
   const [columns, setColumns] = useState<string[]>(loadColumns)
   const [widths, setWidths] = useState<Record<string, number>>(loadWidths)
+  const [widthMode, setWidthMode] = useState<WidthMode>(loadWidthMode)
   const [autoRefresh, setAutoRefresh] = useState(false)
   const [reloadToken, setReloadToken] = useState(0)
   const [lastLoaded, setLastLoaded] = useState<Date>()
@@ -67,6 +76,14 @@ export function Traffic() {
       return next
     })
   }, [])
+
+  function toggleWidthMode() {
+    setWidthMode((prev) => {
+      const next: WidthMode = prev === 'fit' ? 'full' : 'fit'
+      saveWidthMode(next)
+      return next
+    })
+  }
 
   const refresh = useCallback(() => setReloadToken((n) => n + 1), [])
 
@@ -142,6 +159,8 @@ export function Traffic() {
         onToggleLive={() => setLive((v) => !v)}
         columns={columns}
         onColumnsChange={chooseColumns}
+        widthMode={widthMode}
+        onToggleWidthMode={toggleWidthMode}
         autoRefresh={autoRefresh}
         onToggleAutoRefresh={() => setAutoRefresh((v) => !v)}
         onRefresh={refresh}
@@ -153,6 +172,7 @@ export function Traffic() {
         events={events}
         columns={columns}
         widths={widths}
+        widthMode={widthMode}
         onResize={resizeColumn}
         selectedId={selected}
         loading={loading}

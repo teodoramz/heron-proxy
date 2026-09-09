@@ -606,3 +606,28 @@ func TestTopRulesPairsMessageWithItsRule(t *testing.T) {
 		}
 	}
 }
+
+// TestListReturnsBodyPreview checks the traffic table can show a body column
+// without the list query carrying whole payloads.
+func TestListReturnsBodyPreview(t *testing.T) {
+	r := newReader(t)
+	page, err := r.List(context.Background(), fullRange())
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	var found bool
+	for _, e := range page.Events {
+		if e.ReqBodyPreview != "" {
+			found = true
+			if len(e.ReqBodyPreview) > 200 {
+				t.Errorf("preview is %d bytes, want at most 200", len(e.ReqBodyPreview))
+			}
+			if e.ReqBodyPreview != `{"a":"b"}` {
+				t.Errorf("preview = %q", e.ReqBodyPreview)
+			}
+		}
+	}
+	if !found {
+		t.Error("no event carried a body preview")
+	}
+}

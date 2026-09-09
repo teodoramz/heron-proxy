@@ -114,7 +114,8 @@ func scanList(rows driver.Rows) (event.Event, error) {
 		&e.JA3, &e.JA4, &e.Method, &e.Scheme, &e.Host, &e.Path, &e.Query, &e.HTTPVersion,
 		&e.ReqBodySize, &truncated, &e.UserAgent, &e.Status, &e.RespSize, &e.RespContentType,
 		&e.DurationMS, &e.UpstreamMS, &e.WAFMS, &e.AnomalyScore, &e.RuleIDs, &e.RuleTags,
-		&e.RuleSeverity, &e.ParanoiaMax, &wouldBlock, &e.Upstream, &e.Error, &ws)
+		&e.RuleSeverity, &e.ParanoiaMax, &wouldBlock, &e.Upstream, &e.Error, &ws,
+		&e.ReqBodyPreview)
 	if err != nil {
 		return event.Event{}, fmt.Errorf("reader: scan: %w", err)
 	}
@@ -139,6 +140,7 @@ func scanDetail(rows driver.Rows) (event.Event, error) {
 		&e.ReqBodySize, &truncated, &e.UserAgent, &e.Status, &e.RespSize, &e.RespContentType,
 		&e.DurationMS, &e.UpstreamMS, &e.WAFMS, &e.AnomalyScore, &e.RuleIDs, &e.RuleTags,
 		&e.RuleSeverity, &e.ParanoiaMax, &wouldBlock, &e.Upstream, &e.Error, &ws,
+		&e.ReqBodyPreview,
 		&e.ReqHeaders, &e.RespHeaders, &e.ReqBody, &e.ReqBodySHA, &e.ReqBodyBlob,
 		&e.RuleMsgs, &e.ClientPort, &e.ASOrg, &e.RetentionDays)
 	if err != nil {

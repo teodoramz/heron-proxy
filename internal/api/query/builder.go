@@ -11,7 +11,8 @@ const ListColumns = `id, ts, app_id, client_ip, client_ip_claimed, country, asn,
 	method, scheme, host, path, query, http_version, req_body_size, req_truncated, user_agent,
 	status, resp_size, resp_content_type, duration_ms, upstream_ms, waf_ms,
 	anomaly_score, rule_ids, rule_tags, rule_severity, paranoia_max, would_block,
-	upstream, error, is_websocket`
+	upstream, error, is_websocket,
+	substring(req_body_inline, 1, 200) AS req_body_preview`
 
 // DetailColumns is the full projection for a single event.
 const DetailColumns = ListColumns + `, req_headers, resp_headers, req_body_inline,

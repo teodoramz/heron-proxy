@@ -36,7 +36,13 @@ type Event struct {
 	ReqBodySHA   string            `json:"req_body_sha256"`
 	ReqBodyBlob  string            `json:"req_body_blob"`
 	ReqTruncated bool              `json:"req_truncated"`
-	UserAgent    string            `json:"user_agent"`
+
+	// ReqBodyPreview is a bounded slice of the body, filled only by list
+	// queries so the traffic table can show a body column without carrying
+	// whole payloads for every row.
+	ReqBodyPreview string `json:"req_body_preview,omitempty"`
+
+	UserAgent string `json:"user_agent"`
 
 	Status          uint16            `json:"status"`
 	RespHeaders     map[string]string `json:"resp_headers"`

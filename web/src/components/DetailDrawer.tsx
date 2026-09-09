@@ -7,17 +7,17 @@ import { bytes, duration, fullTime, statusClass } from './format'
 type Tab = 'overview' | 'request' | 'response' | 'waf' | 'client' | 'replay'
 
 const TABS: { id: Tab; label: string }[] = [
-  { id: 'overview', label: 'Overview' },
   { id: 'request', label: 'Request' },
-  { id: 'response', label: 'Response' },
   { id: 'waf', label: 'WAF' },
+  { id: 'overview', label: 'Overview' },
   { id: 'client', label: 'Client' },
   { id: 'replay', label: 'Replay' },
+  { id: 'response', label: 'Response' },
 ]
 
 export function DetailDrawer({ id, onClose }: { id: string; onClose: () => void }) {
   const [detail, setDetail] = useState<EventDetail | null>(null)
-  const [tab, setTab] = useState<Tab>('overview')
+  const [tab, setTab] = useState<Tab>('request')
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -117,45 +117,75 @@ function Overview({ detail }: { detail: EventDetail }) {
 
 function RequestTab({ detail }: { detail: EventDetail }) {
   const [raw, setRaw] = useState('')
+  const contentType = detail.req_headers?.['content-type'] ?? ''
+
   return (
     <>
-      <div className="row" style={{ marginBottom: 10 }}>
-        <button
-          className="btn btn-sm"
-          onClick={() => api.exportEvent(detail.id, 'raw').then(setRaw)}
-        >
-          Show raw HTTP
-        </button>
-        <button
-          className="btn btn-sm"
-          onClick={() => api.exportEvent(detail.id, 'curl').then(setRaw)}
-        >
-          Copy as curl
-        </button>
-        <button
-          className="btn btn-sm"
-          onClick={() => api.exportEvent(detail.id, 'har').then(setRaw)}
-        >
-          Export HAR
-        </button>
-      </div>
-      {raw && <pre className="code">{raw}</pre>}
+      <h3 style={{ fontSize: 13, marginTop: 0 }}>
+        Body{' '}
+        <span className="muted" style={{ fontWeight: 400 }}>
+          {detail.req_body_size > 0
+            ? `${bytes(detail.req_body_size)}${contentType ? ` · ${contentType.split(';')[0]}` : ''}`
+            : ''}
+        </span>
+      </h3>
+
+      {detail.body ? (
+        <>
+          <pre className="code">{pretty(detail.body, contentType)}</pre>
+          {detail.req_truncated && (
+            <p className="hint" style={{ marginTop: 4 }}>
+              Truncated at the capture limit. The upstream received all{' '}
+              {bytes(detail.req_body_size)}.
+            </p>
+          )}
+          {detail.body_source === 'blob' && (
+            <p className="hint" style={{ marginTop: 4 }}>
+              Held outside the event store because of its size.
+            </p>
+          )}
+        </>
+      ) : (
+        <p className="muted">
+          {detail.req_body_size > 0
+            ? `This request carried ${bytes(detail.req_body_size)}, but the body was not stored. Capture may be off for this app, the path may be excluded, or the content type is treated as binary.`
+            : 'This request had no body.'}
+        </p>
+      )}
 
       <h3 style={{ fontSize: 13 }}>Headers</h3>
       <Headers map={detail.req_headers} />
 
-      <h3 style={{ fontSize: 13 }}>Body</h3>
-      {detail.body ? (
-        <pre className="code">{detail.body}</pre>
-      ) : (
-        <p className="muted">
-          {detail.req_body_size > 0
-            ? 'The body was not stored for this request.'
-            : 'This request had no body.'}
-        </p>
-      )}
+      <h3 style={{ fontSize: 13 }}>Whole request</h3>
+      <div className="row" style={{ marginBottom: 10 }}>
+        <button className="btn btn-sm" onClick={() => api.exportEvent(detail.id, 'raw').then(setRaw)}>
+          Raw HTTP
+        </button>
+        <button className="btn btn-sm" onClick={() => api.exportEvent(detail.id, 'curl').then(setRaw)}>
+          As curl
+        </button>
+        <button className="btn btn-sm" onClick={() => api.exportEvent(detail.id, 'har').then(setRaw)}>
+          As HAR
+        </button>
+        {raw && (
+          <button className="btn btn-sm" onClick={() => navigator.clipboard?.writeText(raw)}>
+            Copy
+          </button>
+        )}
+      </div>
+      {raw && <pre className="code">{raw}</pre>}
     </>
   )
+}
+
+/** pretty indents JSON so a body is readable; anything else is left alone. */
+function pretty(body: string, contentType: string): string {
+  if (!contentType.includes('json')) return body
+  try {
+    return JSON.stringify(JSON.parse(body), null, 2)
+  } catch {
+    return body
+  }
 }
 
 function ResponseTab({ detail }: { detail: EventDetail }) {
