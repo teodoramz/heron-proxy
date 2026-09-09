@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"math/big"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -262,11 +263,11 @@ func TestUserLifecycle(t *testing.T) {
 	s := newStore(t)
 	ctx := context.Background()
 
-	u, err := s.CreateUser(ctx, "admin@example.test", "hash", RoleAdmin)
+	u, err := s.CreateUser(ctx, "admin", "hash", RoleAdmin)
 	if err != nil {
 		t.Fatalf("CreateUser: %v", err)
 	}
-	got, err := s.GetUserByEmail(ctx, "ADMIN@example.test")
+	got, err := s.GetUserByUsername(ctx, "ADMIN")
 	if err != nil {
 		t.Fatalf("GetUserByEmail: %v", err)
 	}
@@ -297,7 +298,7 @@ func TestUserLifecycle(t *testing.T) {
 
 func TestCreateUserRejectsBadRole(t *testing.T) {
 	s := newStore(t)
-	if _, err := s.CreateUser(context.Background(), "a@b.test", "h", Role("root")); err == nil {
+	if _, err := s.CreateUser(context.Background(), "someone", "h", Role("root")); err == nil {
 		t.Error("invalid role accepted")
 	}
 }
@@ -316,7 +317,7 @@ func TestAppAccessScoping(t *testing.T) {
 	ctx := context.Background()
 	mustSaveApp(t, s, testApp("a"))
 	mustSaveApp(t, s, testApp("b"))
-	u, _ := s.CreateUser(ctx, "analyst@example.test", "h", RoleAnalyst)
+	u, _ := s.CreateUser(ctx, "analyst", "h", RoleAnalyst)
 
 	if err := s.SetAppAccess(ctx, u.ID, []string{"a"}); err != nil {
 		t.Fatalf("SetAppAccess: %v", err)
@@ -511,8 +512,8 @@ func TestAnnotationsAndBookmarks(t *testing.T) {
 func TestSavedFilters(t *testing.T) {
 	s := newStore(t)
 	ctx := context.Background()
-	owner, _ := s.CreateUser(ctx, "a@example.test", "h", RoleAnalyst)
-	other, _ := s.CreateUser(ctx, "b@example.test", "h", RoleAnalyst)
+	owner, _ := s.CreateUser(ctx, "owner", "h", RoleAnalyst)
+	other, _ := s.CreateUser(ctx, "other", "h", RoleAnalyst)
 
 	if _, err := s.SaveFilter(ctx, SavedFilter{
 		UserID: owner.ID, Name: "private", Query: json.RawMessage(`{"status":404}`),
@@ -538,8 +539,8 @@ func TestSavedFilters(t *testing.T) {
 func TestDeleteFilterRequiresOwnership(t *testing.T) {
 	s := newStore(t)
 	ctx := context.Background()
-	owner, _ := s.CreateUser(ctx, "a@example.test", "h", RoleAnalyst)
-	other, _ := s.CreateUser(ctx, "b@example.test", "h", RoleAnalyst)
+	owner, _ := s.CreateUser(ctx, "owner", "h", RoleAnalyst)
+	other, _ := s.CreateUser(ctx, "other", "h", RoleAnalyst)
 	f, _ := s.SaveFilter(ctx, SavedFilter{UserID: owner.ID, Name: "f", Query: json.RawMessage(`{}`), Shared: true})
 
 	if err := s.DeleteFilter(ctx, f.ID, other.ID); !errors.Is(err, ErrNotFound) {
@@ -595,7 +596,7 @@ func TestAlertRuleRejectsBadChannel(t *testing.T) {
 func TestAuditLog(t *testing.T) {
 	s := newStore(t)
 	ctx := context.Background()
-	u, _ := s.CreateUser(ctx, "a@example.test", "h", RoleAdmin)
+	u, _ := s.CreateUser(ctx, "auditor", "h", RoleAdmin)
 
 	if err := s.Audit(ctx, u.ID, "app.update", map[string]string{"app": "api"}); err != nil {
 		t.Fatalf("Audit: %v", err)
@@ -715,5 +716,49 @@ func TestCertificateAuthorityMissingBeforeCreation(t *testing.T) {
 	s := newStore(t)
 	if _, err := s.LoadCA(context.Background()); !errors.Is(err, ErrNotFound) {
 		t.Errorf("err = %v, want ErrNotFound", err)
+	}
+}
+
+func TestUsernameRules(t *testing.T) {
+	for _, name := range []string{"a", "", "  ", "has space", "user@example.com", "sláinte", strings.Repeat("x", 41)} {
+		if err := ValidUsername(name); err == nil {
+			t.Errorf("ValidUsername(%q) accepted it", name)
+		}
+	}
+	for _, name := range []string{"admin", "a.b", "first-last", "under_score", "user123"} {
+		if err := ValidUsername(name); err != nil {
+			t.Errorf("ValidUsername(%q): %v", name, err)
+		}
+	}
+}
+
+func TestUsernamesAreUniqueIgnoringCase(t *testing.T) {
+	s := newStore(t)
+	ctx := context.Background()
+
+	if _, err := s.CreateUser(ctx, "Morgan", "hash", RoleViewer); err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+	if _, err := s.CreateUser(ctx, "morgan", "hash", RoleViewer); !errors.Is(err, ErrUsernameTaken) {
+		t.Errorf("err = %v, want ErrUsernameTaken", err)
+	}
+}
+
+func TestSignInIgnoresCaseAndSurroundingSpace(t *testing.T) {
+	s := newStore(t)
+	ctx := context.Background()
+	created, err := s.CreateUser(ctx, "Morgan", "hash", RoleAnalyst)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, typed := range []string{"Morgan", "morgan", "  MORGAN  "} {
+		got, err := s.GetUserByUsername(ctx, typed)
+		if err != nil {
+			t.Errorf("GetUserByUsername(%q): %v", typed, err)
+			continue
+		}
+		if got.ID != created.ID {
+			t.Errorf("GetUserByUsername(%q) found a different account", typed)
+		}
 	}
 }

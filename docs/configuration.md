@@ -49,7 +49,7 @@ Postgres and is edited in the UI.
 | `API_ALLOWED_ORIGINS` | — | Comma-separated origins for cross-origin use, for both CORS and the live-tail websocket. Same-origin needs none. |
 | `API_PROXY_STREAM_URL` | `ws://proxy:9090/internal/stream` | Where live tail reads from. |
 | `SESSION_KEY` | random | Signs session cookies. Unset means everyone is signed out on restart. |
-| `ADMIN_EMAIL`, `ADMIN_PASSWORD` | — | Creates the first administrator, on first start only. |
+| `ADMIN_USERNAME`, `ADMIN_PASSWORD` | — | Creates the first administrator, on first start only. A username is 2–40 characters of letters, digits, dots, dashes or underscores. |
 
 ## Per-application policy
 

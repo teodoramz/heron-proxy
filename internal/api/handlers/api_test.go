@@ -14,11 +14,11 @@ import (
 
 func TestLoginRejectsBadCredentials(t *testing.T) {
 	h := newHarness(t)
-	h.login(t, "admin@example.test", store.RoleAdmin, nil)
+	h.login(t, "admin", store.RoleAdmin, nil)
 
 	c := &client{t: t, base: h.server.URL, http: &http.Client{Jar: newJar()}}
 	resp := c.do(http.MethodPost, "/api/auth/login",
-		map[string]string{"email": "admin@example.test", "password": "wrong"})
+		map[string]string{"username": "admin", "password": "wrong"})
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusUnauthorized {
 		t.Errorf("status = %d, want 401", resp.StatusCode)
@@ -29,7 +29,7 @@ func TestLoginRejectsUnknownEmail(t *testing.T) {
 	h := newHarness(t)
 	c := &client{t: t, base: h.server.URL, http: &http.Client{Jar: newJar()}}
 	resp := c.do(http.MethodPost, "/api/auth/login",
-		map[string]string{"email": "nobody@example.test", "password": "whatever12345"})
+		map[string]string{"username": "nobody", "password": "whatever12345"})
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusUnauthorized {
 		t.Errorf("status = %d, want 401", resp.StatusCode)
@@ -50,20 +50,20 @@ func TestUnauthenticatedRequestsRejected(t *testing.T) {
 
 func TestMe(t *testing.T) {
 	h := newHarness(t)
-	c := h.login(t, "viewer@example.test", store.RoleViewer, nil)
+	c := h.login(t, "viewer", store.RoleViewer, nil)
 
 	var out struct {
 		User store.User `json:"user"`
 	}
 	c.decode(c.get("/api/me"), http.StatusOK, &out)
-	if out.User.Email != "viewer@example.test" || out.User.Role != store.RoleViewer {
+	if out.User.Username != "viewer" || out.User.Role != store.RoleViewer {
 		t.Errorf("user = %+v", out.User)
 	}
 }
 
 func TestListTraffic(t *testing.T) {
 	h := newHarness(t)
-	c := h.login(t, "analyst@example.test", store.RoleAnalyst, nil)
+	c := h.login(t, "analyst", store.RoleAnalyst, nil)
 
 	var page struct {
 		Events []map[string]any `json:"events"`
@@ -76,7 +76,7 @@ func TestListTraffic(t *testing.T) {
 
 func TestTrafficSearchWithFilter(t *testing.T) {
 	h := newHarness(t)
-	c := h.login(t, "analyst@example.test", store.RoleAnalyst, nil)
+	c := h.login(t, "analyst", store.RoleAnalyst, nil)
 
 	filter := map[string]any{
 		"from": "2026-04-01T00:00:00Z",
@@ -102,7 +102,7 @@ func TestTrafficSearchWithFilter(t *testing.T) {
 
 func TestTrafficRejectsUnknownFilterField(t *testing.T) {
 	h := newHarness(t)
-	c := h.login(t, "analyst@example.test", store.RoleAnalyst, nil)
+	c := h.login(t, "analyst", store.RoleAnalyst, nil)
 
 	filter := map[string]any{"root": map[string]any{"op": "and", "conditions": []map[string]any{
 		{"field": "password", "op": "eq", "value": "x"},
@@ -116,7 +116,7 @@ func TestTrafficRejectsUnknownFilterField(t *testing.T) {
 
 func TestAppScopingHidesOtherApps(t *testing.T) {
 	h := newHarness(t)
-	c := h.login(t, "scoped@example.test", store.RoleAnalyst, []string{"web"})
+	c := h.login(t, "scoped", store.RoleAnalyst, []string{"web"})
 
 	var page struct {
 		Events []map[string]any `json:"events"`
@@ -134,7 +134,7 @@ func TestAppScopingHidesOtherApps(t *testing.T) {
 // for another app explicitly must not grant access to it.
 func TestScopedUserCannotWidenScope(t *testing.T) {
 	h := newHarness(t)
-	c := h.login(t, "scoped@example.test", store.RoleAnalyst, []string{"web"})
+	c := h.login(t, "scoped", store.RoleAnalyst, []string{"web"})
 
 	resp := c.get("/api/traffic?app=api&from=2026-04-01T00:00:00Z&to=2026-04-02T00:00:00Z")
 	defer resp.Body.Close()
@@ -145,7 +145,7 @@ func TestScopedUserCannotWidenScope(t *testing.T) {
 
 func TestGetTrafficDetail(t *testing.T) {
 	h := newHarness(t)
-	c := h.login(t, "analyst@example.test", store.RoleAnalyst, nil)
+	c := h.login(t, "analyst", store.RoleAnalyst, nil)
 
 	var detail map[string]any
 	c.decode(c.get("/api/traffic/"+h.events[1].ID), http.StatusOK, &detail)
@@ -163,7 +163,7 @@ func TestGetTrafficDetail(t *testing.T) {
 
 func TestViewerCannotSeeBodies(t *testing.T) {
 	h := newHarness(t)
-	c := h.login(t, "viewer@example.test", store.RoleViewer, nil)
+	c := h.login(t, "viewer", store.RoleViewer, nil)
 
 	var detail map[string]any
 	c.decode(c.get("/api/traffic/"+h.events[1].ID), http.StatusOK, &detail)
@@ -177,7 +177,7 @@ func TestViewerCannotSeeBodies(t *testing.T) {
 
 func TestGetTrafficMissing(t *testing.T) {
 	h := newHarness(t)
-	c := h.login(t, "viewer@example.test", store.RoleViewer, nil)
+	c := h.login(t, "viewer", store.RoleViewer, nil)
 	resp := c.get("/api/traffic/3a1f2b4c-5d6e-4f70-8192-a3b4c5d6e7f8")
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusNotFound {
@@ -187,7 +187,7 @@ func TestGetTrafficMissing(t *testing.T) {
 
 func TestExportFormats(t *testing.T) {
 	h := newHarness(t)
-	c := h.login(t, "analyst@example.test", store.RoleAnalyst, nil)
+	c := h.login(t, "analyst", store.RoleAnalyst, nil)
 	id := h.events[1].ID
 
 	resp := c.get("/api/traffic/" + id + "/export")
@@ -211,7 +211,7 @@ func TestExportFormats(t *testing.T) {
 
 func TestCount(t *testing.T) {
 	h := newHarness(t)
-	c := h.login(t, "viewer@example.test", store.RoleViewer, nil)
+	c := h.login(t, "viewer", store.RoleViewer, nil)
 
 	var out struct {
 		Count  int  `json:"count"`
@@ -225,7 +225,7 @@ func TestCount(t *testing.T) {
 
 func TestStatsEndpoints(t *testing.T) {
 	h := newHarness(t)
-	c := h.login(t, "viewer@example.test", store.RoleViewer, nil)
+	c := h.login(t, "viewer", store.RoleViewer, nil)
 	rng := "?from=2026-04-01T00:00:00Z&to=2026-04-02T00:00:00Z"
 
 	var summary struct {
@@ -248,7 +248,7 @@ func TestStatsEndpoints(t *testing.T) {
 
 func TestSimulateThreshold(t *testing.T) {
 	h := newHarness(t)
-	c := h.login(t, "viewer@example.test", store.RoleViewer, nil)
+	c := h.login(t, "viewer", store.RoleViewer, nil)
 
 	var sim struct {
 		Total      int `json:"total"`
@@ -263,7 +263,7 @@ func TestSimulateThreshold(t *testing.T) {
 
 func TestSimulateRejectsBadThreshold(t *testing.T) {
 	h := newHarness(t)
-	c := h.login(t, "viewer@example.test", store.RoleViewer, nil)
+	c := h.login(t, "viewer", store.RoleViewer, nil)
 	resp := c.get("/api/simulate?threshold=abc")
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusBadRequest {
@@ -273,7 +273,7 @@ func TestSimulateRejectsBadThreshold(t *testing.T) {
 
 func TestIPProfile(t *testing.T) {
 	h := newHarness(t)
-	c := h.login(t, "viewer@example.test", store.RoleViewer, nil)
+	c := h.login(t, "viewer", store.RoleViewer, nil)
 
 	var profile struct {
 		ClientIP string `json:"client_ip"`
@@ -290,8 +290,8 @@ func TestIPProfile(t *testing.T) {
 
 func TestRoleGating(t *testing.T) {
 	h := newHarness(t)
-	viewer := h.login(t, "viewer@example.test", store.RoleViewer, nil)
-	analyst := h.login(t, "analyst@example.test", store.RoleAnalyst, nil)
+	viewer := h.login(t, "viewer", store.RoleViewer, nil)
+	analyst := h.login(t, "analyst", store.RoleAnalyst, nil)
 
 	// Viewer may not annotate.
 	resp := viewer.do(http.MethodPost, "/api/traffic/"+h.events[0].ID+"/annotate",
@@ -320,7 +320,7 @@ func TestRoleGating(t *testing.T) {
 
 func TestCSRFRequiredForMutations(t *testing.T) {
 	h := newHarness(t)
-	c := h.login(t, "admin@example.test", store.RoleAdmin, nil)
+	c := h.login(t, "admin", store.RoleAdmin, nil)
 	c.csrf = "" // drop the token
 
 	resp := c.do(http.MethodPost, "/api/apps", map[string]any{"id": "x"})
@@ -332,7 +332,7 @@ func TestCSRFRequiredForMutations(t *testing.T) {
 
 func TestAppCRUD(t *testing.T) {
 	h := newHarness(t)
-	c := h.login(t, "admin@example.test", store.RoleAdmin, nil)
+	c := h.login(t, "admin", store.RoleAdmin, nil)
 
 	app := map[string]any{
 		"id": "shop", "name": "Shop", "hostnames": []string{"shop.example"},
@@ -363,7 +363,7 @@ func TestAppCRUD(t *testing.T) {
 
 func TestAppValidation(t *testing.T) {
 	h := newHarness(t)
-	c := h.login(t, "admin@example.test", store.RoleAdmin, nil)
+	c := h.login(t, "admin", store.RoleAdmin, nil)
 
 	cases := []map[string]any{
 		{"id": "", "hostnames": []string{"a.example"}, "upstream_url": "http://127.0.0.1:9"},
@@ -382,13 +382,13 @@ func TestAppValidation(t *testing.T) {
 
 func TestUserManagement(t *testing.T) {
 	h := newHarness(t)
-	c := h.login(t, "admin@example.test", store.RoleAdmin, nil)
+	c := h.login(t, "admin", store.RoleAdmin, nil)
 
 	var created struct {
 		ID string `json:"id"`
 	}
 	c.decode(c.do(http.MethodPost, "/api/users", map[string]any{
-		"email": "new@example.test", "password": "a-long-enough-password", "role": "analyst",
+		"username": "newcomer", "password": "a-long-enough-password", "role": "analyst",
 	}), http.StatusCreated, &created)
 
 	resp := c.do(http.MethodPatch, "/api/users/"+created.ID,
@@ -407,12 +407,12 @@ func TestUserManagement(t *testing.T) {
 
 func TestUserCreationValidation(t *testing.T) {
 	h := newHarness(t)
-	c := h.login(t, "admin@example.test", store.RoleAdmin, nil)
+	c := h.login(t, "admin", store.RoleAdmin, nil)
 
 	for _, body := range []map[string]any{
-		{"email": "x@example.test", "password": "short", "role": "admin"},
-		{"email": "", "password": "a-long-enough-password", "role": "admin"},
-		{"email": "y@example.test", "password": "a-long-enough-password", "role": "root"},
+		{"username": "shorty", "password": "short", "role": "admin"},
+		{"username": "", "password": "a-long-enough-password", "role": "admin"},
+		{"username": "rooty", "password": "a-long-enough-password", "role": "root"},
 	} {
 		resp := c.do(http.MethodPost, "/api/users", body)
 		resp.Body.Close()
@@ -424,7 +424,7 @@ func TestUserCreationValidation(t *testing.T) {
 
 func TestAdminCannotDeleteSelf(t *testing.T) {
 	h := newHarness(t)
-	c := h.login(t, "admin@example.test", store.RoleAdmin, nil)
+	c := h.login(t, "admin", store.RoleAdmin, nil)
 
 	var me struct {
 		User store.User `json:"user"`
@@ -440,7 +440,7 @@ func TestAdminCannotDeleteSelf(t *testing.T) {
 
 func TestAnnotationAndVerdictFlow(t *testing.T) {
 	h := newHarness(t)
-	c := h.login(t, "analyst@example.test", store.RoleAnalyst, nil)
+	c := h.login(t, "analyst", store.RoleAnalyst, nil)
 	id := h.events[1].ID
 
 	c.decode(c.do(http.MethodPost, "/api/traffic/"+id+"/annotate", map[string]any{
@@ -472,7 +472,7 @@ func TestAnnotationAndVerdictFlow(t *testing.T) {
 
 func TestExclusionFlow(t *testing.T) {
 	h := newHarness(t)
-	c := h.login(t, "analyst@example.test", store.RoleAnalyst, nil)
+	c := h.login(t, "analyst", store.RoleAnalyst, nil)
 
 	var preview struct {
 		SecLang string `json:"seclang"`
@@ -515,7 +515,7 @@ func TestExclusionFlow(t *testing.T) {
 
 func TestExclusionRequiresRuleID(t *testing.T) {
 	h := newHarness(t)
-	c := h.login(t, "analyst@example.test", store.RoleAnalyst, nil)
+	c := h.login(t, "analyst", store.RoleAnalyst, nil)
 	resp := c.do(http.MethodPost, "/api/exclusions", map[string]any{"app_id": "api"})
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusBadRequest {
@@ -525,7 +525,7 @@ func TestExclusionRequiresRuleID(t *testing.T) {
 
 func TestSavedFilters(t *testing.T) {
 	h := newHarness(t)
-	c := h.login(t, "analyst@example.test", store.RoleAnalyst, nil)
+	c := h.login(t, "analyst", store.RoleAnalyst, nil)
 
 	var saved struct {
 		ID string `json:"id"`
@@ -552,7 +552,7 @@ func TestSavedFilters(t *testing.T) {
 
 func TestSavedFilterRejectsInvalidQuery(t *testing.T) {
 	h := newHarness(t)
-	c := h.login(t, "analyst@example.test", store.RoleAnalyst, nil)
+	c := h.login(t, "analyst", store.RoleAnalyst, nil)
 	resp := c.do(http.MethodPost, "/api/filters", map[string]any{
 		"name":  "bad",
 		"query": map[string]any{"root": map[string]any{"op": "and", "conditions": []map[string]any{{"field": "nope", "op": "eq", "value": 1}}}},
@@ -565,7 +565,7 @@ func TestSavedFilterRejectsInvalidQuery(t *testing.T) {
 
 func TestFilterSchema(t *testing.T) {
 	h := newHarness(t)
-	c := h.login(t, "viewer@example.test", store.RoleViewer, nil)
+	c := h.login(t, "viewer", store.RoleViewer, nil)
 
 	var schema struct {
 		Fields []struct {
@@ -587,7 +587,7 @@ func TestFilterSchema(t *testing.T) {
 
 func TestAlertCRUD(t *testing.T) {
 	h := newHarness(t)
-	c := h.login(t, "admin@example.test", store.RoleAdmin, nil)
+	c := h.login(t, "admin", store.RoleAdmin, nil)
 
 	var created struct {
 		ID string `json:"id"`
@@ -615,7 +615,7 @@ func TestAlertCRUD(t *testing.T) {
 
 func TestAuditLogRecordsChanges(t *testing.T) {
 	h := newHarness(t)
-	c := h.login(t, "admin@example.test", store.RoleAdmin, nil)
+	c := h.login(t, "admin", store.RoleAdmin, nil)
 
 	c.decode(c.do(http.MethodPost, "/api/apps", map[string]any{
 		"id": "audited", "hostnames": []string{"audited.example"}, "upstream_url": "http://127.0.0.1:9",
@@ -641,7 +641,7 @@ func TestAuditLogRecordsChanges(t *testing.T) {
 
 func TestReplayRefusesPrivateCustomTarget(t *testing.T) {
 	h := newHarness(t)
-	c := h.login(t, "admin@example.test", store.RoleAdmin, nil)
+	c := h.login(t, "admin", store.RoleAdmin, nil)
 
 	resp := c.do(http.MethodPost, "/api/traffic/"+h.events[0].ID+"/replay",
 		map[string]any{"target": "http://169.254.169.254/latest/meta-data/"})
@@ -653,7 +653,7 @@ func TestReplayRefusesPrivateCustomTarget(t *testing.T) {
 
 func TestReplayCustomTargetRequiresAdmin(t *testing.T) {
 	h := newHarness(t)
-	c := h.login(t, "analyst@example.test", store.RoleAnalyst, nil)
+	c := h.login(t, "analyst", store.RoleAnalyst, nil)
 
 	resp := c.do(http.MethodPost, "/api/traffic/"+h.events[0].ID+"/replay",
 		map[string]any{"target": "https://example.com"})
@@ -665,7 +665,7 @@ func TestReplayCustomTargetRequiresAdmin(t *testing.T) {
 
 func TestLogout(t *testing.T) {
 	h := newHarness(t)
-	c := h.login(t, "viewer@example.test", store.RoleViewer, nil)
+	c := h.login(t, "viewer", store.RoleViewer, nil)
 
 	resp := c.do(http.MethodPost, "/api/auth/logout", nil)
 	resp.Body.Close()
@@ -695,7 +695,7 @@ func TestHealthz(t *testing.T) {
 // fields become Go zero values, leaving a new app recording nothing.
 func TestNewAppGetsWorkingDefaults(t *testing.T) {
 	h := newHarness(t)
-	c := h.login(t, "admin@example.test", store.RoleAdmin, nil)
+	c := h.login(t, "admin", store.RoleAdmin, nil)
 
 	c.decode(c.do(http.MethodPost, "/api/apps", map[string]any{
 		"id": "minimal", "hostnames": []string{"minimal.example"},
@@ -736,7 +736,7 @@ func TestNewAppGetsWorkingDefaults(t *testing.T) {
 // replaces, so a partial update cannot silently disable an app.
 func TestUpdateDoesNotResetOmittedFields(t *testing.T) {
 	h := newHarness(t)
-	c := h.login(t, "admin@example.test", store.RoleAdmin, nil)
+	c := h.login(t, "admin", store.RoleAdmin, nil)
 
 	c.decode(c.do(http.MethodPost, "/api/apps", map[string]any{
 		"id": "merge", "hostnames": []string{"merge.example"},
@@ -776,7 +776,7 @@ func TestUpdateDoesNotResetOmittedFields(t *testing.T) {
 // is parsed and sent, rather than only the recorded one being replayed.
 func TestReplayAcceptsRawRequest(t *testing.T) {
 	h := newHarness(t)
-	c := h.login(t, "admin@example.test", store.RoleAdmin, nil)
+	c := h.login(t, "admin", store.RoleAdmin, nil)
 
 	seen := make(chan *http.Request, 1)
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -834,7 +834,7 @@ func TestReplayAcceptsRawRequest(t *testing.T) {
 
 func TestReplayRejectsUnparseableRaw(t *testing.T) {
 	h := newHarness(t)
-	c := h.login(t, "admin@example.test", store.RoleAdmin, nil)
+	c := h.login(t, "admin", store.RoleAdmin, nil)
 
 	resp := c.do(http.MethodPost, "/api/traffic/"+h.events[0].ID+"/replay",
 		map[string]any{"raw": "this is not an HTTP request"})
@@ -846,7 +846,7 @@ func TestReplayRejectsUnparseableRaw(t *testing.T) {
 
 func TestRuleCatalogueEndpoints(t *testing.T) {
 	h := newHarness(t)
-	c := h.login(t, "viewer@example.test", store.RoleViewer, nil)
+	c := h.login(t, "viewer", store.RoleViewer, nil)
 
 	var facets struct {
 		Total      int      `json:"total"`

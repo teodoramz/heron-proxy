@@ -3,14 +3,13 @@ package handlers
 import (
 	"errors"
 	"net/http"
-	"strings"
 
 	"github.com/amzteodor/proxy-waf/internal/api/auth"
 	"github.com/amzteodor/proxy-waf/internal/store"
 )
 
 type loginRequest struct {
-	Email    string `json:"email"`
+	Username string `json:"username"`
 	Password string `json:"password"`
 }
 
@@ -21,16 +20,16 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	user, err := h.Store.GetUserByEmail(r.Context(), strings.TrimSpace(req.Email))
+	user, err := h.Store.GetUserByUsername(r.Context(), req.Username)
 	if err != nil {
 		// Hash anyway so a missing account and a wrong password cost the same.
 		_, _ = auth.VerifyPassword(req.Password, dummyHash)
-		writeError(w, http.StatusUnauthorized, "invalid credentials")
+		writeError(w, http.StatusUnauthorized, "that username and password do not match an account")
 		return
 	}
 	ok, err := auth.VerifyPassword(req.Password, user.PasswordHash)
 	if err != nil || !ok || !user.Enabled {
-		writeError(w, http.StatusUnauthorized, "invalid credentials")
+		writeError(w, http.StatusUnauthorized, "that username and password do not match an account")
 		return
 	}
 	csrf, err := h.Auth.SetSessionCookies(w, user.ID)
@@ -39,7 +38,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = h.Store.TouchLogin(r.Context(), user.ID)
-	_ = h.Store.Audit(r.Context(), user.ID, "auth.login", map[string]string{"email": user.Email})
+	_ = h.Store.Audit(r.Context(), user.ID, "auth.login", map[string]string{"username": user.Username})
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"user":       user,
@@ -63,7 +62,7 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 }
 
 type userRequest struct {
-	Email    string     `json:"email"`
+	Username string     `json:"username"`
 	Password string     `json:"password"`
 	Role     store.Role `json:"role"`
 	Enabled  bool       `json:"enabled"`
@@ -87,8 +86,12 @@ func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	if strings.TrimSpace(req.Email) == "" || len(req.Password) < 12 {
-		writeError(w, http.StatusBadRequest, "email is required and the password must be at least 12 characters")
+	if err := store.ValidUsername(req.Username); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if len(req.Password) < 12 {
+		writeError(w, http.StatusBadRequest, "the password must be at least 12 characters")
 		return
 	}
 	if !req.Role.Valid() {
@@ -100,7 +103,7 @@ func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	user, err := h.Store.CreateUser(r.Context(), strings.TrimSpace(req.Email), hash, req.Role)
+	user, err := h.Store.CreateUser(r.Context(), req.Username, hash, req.Role)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -111,7 +114,7 @@ func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	h.audit(r, "user.create", map[string]any{"user_id": user.ID, "email": user.Email, "role": req.Role})
+	h.audit(r, "user.create", map[string]any{"user_id": user.ID, "username": user.Username, "role": req.Role})
 	writeJSON(w, http.StatusCreated, user)
 }
 

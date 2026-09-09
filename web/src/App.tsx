@@ -49,7 +49,7 @@ export default function App() {
           )}
         </div>
         <div className="rail-foot">
-          <span className="mono">{user.email}</span>
+          <span className="mono">{user.username}</span>
           <span className="muted">{user.role}</span>
           <div className="row">
             <button className="btn btn-sm" onClick={toggleTheme}>

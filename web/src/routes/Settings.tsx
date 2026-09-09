@@ -34,7 +34,7 @@ export function Settings() {
             <table className="data">
               <thead>
                 <tr>
-                  <th>Email</th>
+                  <th>Username</th>
                   <th>Role</th>
                   <th>Last signed in</th>
                   <th />
@@ -43,7 +43,7 @@ export function Settings() {
               <tbody>
                 {users.map((u) => (
                   <tr key={u.id}>
-                    <td>{u.email}</td>
+                    <td>{u.username}</td>
                     <td>
                       <select
                         className="select"
@@ -52,7 +52,7 @@ export function Settings() {
                         onChange={(e) =>
                           api.updateUser(u.id, { role: e.target.value, enabled: u.enabled }).then(reload)
                         }
-                        aria-label={`Role for ${u.email}`}
+                        aria-label={`Role for ${u.username}`}
                       >
                         <option value="viewer">viewer</option>
                         <option value="analyst">analyst</option>
@@ -151,7 +151,7 @@ export function Settings() {
 }
 
 function NewUser({ apps, onSaved }: { apps: App[]; onSaved: () => void }) {
-  const [email, setEmail] = useState('')
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [role, setRole] = useState('viewer')
   const [scoped, setScoped] = useState<string[]>([])
@@ -161,8 +161,8 @@ function NewUser({ apps, onSaved }: { apps: App[]; onSaved: () => void }) {
     e.preventDefault()
     setError('')
     try {
-      await api.createUser({ email, password, role, apps: scoped })
-      setEmail('')
+      await api.createUser({ username, password, role, apps: scoped })
+      setUsername('')
       setPassword('')
       setScoped([])
       onSaved()
@@ -177,8 +177,17 @@ function NewUser({ apps, onSaved }: { apps: App[]; onSaved: () => void }) {
       {error && <p className="error-msg">{error}</p>}
       <div className="row" style={{ gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
         <div className="field" style={{ marginBottom: 0 }}>
-          <label htmlFor="new-email">Email</label>
-          <input id="new-email" className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          <label htmlFor="new-username">Username</label>
+          <input
+            id="new-username"
+            className="input"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            placeholder="letters, digits, . - _"
+            autoCapitalize="none"
+            spellCheck={false}
+            required
+          />
         </div>
         <div className="field" style={{ marginBottom: 0 }}>
           <label htmlFor="new-password">Password (12 characters or more)</label>

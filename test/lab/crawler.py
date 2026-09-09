@@ -45,6 +45,15 @@ JOURNEYS = {
         (4, "GET", "/status/503", None),
         (2, "GET", "/delay/2", None),
     ],
+    "fresh.local": [
+        (30, "GET", "/html", None),
+        (20, "GET", "/get?from=newsletter", None),
+        (15, "GET", "/json", None),
+        (12, "POST", "/post", {"email": "reader@example.com", "list": "weekly"}),
+        (10, "GET", "/status/404", None),
+        (8, "GET", "/bytes/2048", None),
+        (5, "GET", "/status/503", None),
+    ],
     "blog.local": [
         (40, "GET", "/html", None),
         (25, "GET", "/get?post=the-quiet-part", None),

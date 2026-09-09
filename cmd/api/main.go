@@ -5,6 +5,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -144,11 +145,14 @@ func bootstrapAdmin(ctx context.Context, db *store.Store, log *slog.Logger) erro
 	if len(users) > 0 {
 		return nil
 	}
-	email := strings.TrimSpace(os.Getenv("ADMIN_EMAIL"))
+	username := strings.TrimSpace(os.Getenv("ADMIN_USERNAME"))
 	password := os.Getenv("ADMIN_PASSWORD")
-	if email == "" || password == "" {
-		log.Warn("no users exist and ADMIN_EMAIL/ADMIN_PASSWORD are unset; create an admin before signing in")
+	if username == "" || password == "" {
+		log.Warn("no users exist and ADMIN_USERNAME/ADMIN_PASSWORD are unset; create an administrator before signing in")
 		return nil
+	}
+	if err := store.ValidUsername(username); err != nil {
+		return fmt.Errorf("ADMIN_USERNAME: %w", err)
 	}
 	if len(password) < 12 {
 		return errors.New("ADMIN_PASSWORD must be at least 12 characters")
@@ -157,10 +161,10 @@ func bootstrapAdmin(ctx context.Context, db *store.Store, log *slog.Logger) erro
 	if err != nil {
 		return err
 	}
-	user, err := db.CreateUser(ctx, email, hash, store.RoleAdmin)
+	user, err := db.CreateUser(ctx, username, hash, store.RoleAdmin)
 	if err != nil {
 		return err
 	}
-	log.Info("bootstrapped the first administrator", "email", user.Email)
+	log.Info("bootstrapped the first administrator", "username", user.Username)
 	return nil
 }

@@ -150,7 +150,7 @@ type client struct {
 }
 
 // login creates a user with the given role and returns a client signed in as them.
-func (h *harness) login(t *testing.T, email string, role store.Role, apps []string) *client {
+func (h *harness) login(t *testing.T, username string, role store.Role, apps []string) *client {
 	t.Helper()
 	ctx := context.Background()
 	const password = "correct-horse-battery-staple"
@@ -159,7 +159,7 @@ func (h *harness) login(t *testing.T, email string, role store.Role, apps []stri
 	if err != nil {
 		t.Fatal(err)
 	}
-	user, err := h.store.CreateUser(ctx, email, hash, role)
+	user, err := h.store.CreateUser(ctx, username, hash, role)
 	if err != nil {
 		t.Fatalf("CreateUser: %v", err)
 	}
@@ -171,7 +171,7 @@ func (h *harness) login(t *testing.T, email string, role store.Role, apps []stri
 
 	jar := newJar()
 	c := &client{t: t, base: h.server.URL, http: &http.Client{Jar: jar}}
-	body, _ := json.Marshal(map[string]string{"email": email, "password": password})
+	body, _ := json.Marshal(map[string]string{"username": username, "password": password})
 	resp, err := c.http.Post(c.base+"/api/auth/login", "application/json", bytes.NewReader(body))
 	if err != nil {
 		t.Fatalf("login: %v", err)

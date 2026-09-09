@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -37,7 +38,7 @@ func (r Role) AtLeast(want Role) bool {
 // User is an account that can sign in to the API.
 type User struct {
 	ID           string     `json:"id"`
-	Email        string     `json:"email"`
+	Username     string     `json:"username"`
 	PasswordHash string     `json:"-"`
 	Role         Role       `json:"role"`
 	Enabled      bool       `json:"enabled"`
@@ -45,40 +46,70 @@ type User struct {
 	LastLoginAt  *time.Time `json:"last_login_at,omitempty"`
 }
 
+// ErrUsernameTaken reports a username already in use.
+var ErrUsernameTaken = errors.New("store: that username is already taken")
+
+// ValidUsername reports whether a name is usable, and why not if it is not.
+//
+// Letters, digits and a few separators only: a username appears in the audit
+// log and in the interface, so it should be readable and unambiguous.
+func ValidUsername(name string) error {
+	name = strings.TrimSpace(name)
+	if len(name) < 2 || len(name) > 40 {
+		return errors.New("a username must be between 2 and 40 characters")
+	}
+	for _, r := range name {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9':
+		case r == '.' || r == '-' || r == '_':
+		default:
+			return fmt.Errorf("a username cannot contain %q; use letters, digits, dots, dashes or underscores", r)
+		}
+	}
+	return nil
+}
+
 // CreateUser inserts a user and returns it.
-func (s *Store) CreateUser(ctx context.Context, email, passwordHash string, role Role) (User, error) {
+func (s *Store) CreateUser(ctx context.Context, username, passwordHash string, role Role) (User, error) {
 	if !role.Valid() {
 		return User{}, fmt.Errorf("store: invalid role %q", role)
 	}
-	u := User{Email: email, Role: role, Enabled: true, PasswordHash: passwordHash}
+	username = strings.TrimSpace(username)
+	if err := ValidUsername(username); err != nil {
+		return User{}, err
+	}
+	u := User{Username: username, Role: role, Enabled: true, PasswordHash: passwordHash}
 	err := s.pool.QueryRow(ctx, `
-		INSERT INTO users (email, password_hash, role) VALUES ($1,$2,$3)
-		RETURNING id, created_at`, email, passwordHash, string(role)).Scan(&u.ID, &u.CreatedAt)
+		INSERT INTO users (username, password_hash, role) VALUES ($1,$2,$3)
+		RETURNING id, created_at`, username, passwordHash, string(role)).Scan(&u.ID, &u.CreatedAt)
 	if err != nil {
+		if strings.Contains(err.Error(), "users_username_lower_idx") || strings.Contains(err.Error(), "duplicate key") {
+			return User{}, ErrUsernameTaken
+		}
 		return User{}, fmt.Errorf("store: create user: %w", err)
 	}
 	return u, nil
 }
 
-// GetUserByEmail looks a user up for sign-in.
-func (s *Store) GetUserByEmail(ctx context.Context, email string) (User, error) {
+// GetUserByUsername looks a user up for sign-in, ignoring case.
+func (s *Store) GetUserByUsername(ctx context.Context, username string) (User, error) {
 	return s.scanUser(s.pool.QueryRow(ctx, `
-		SELECT id, email, password_hash, role, enabled, created_at, last_login_at
-		FROM users WHERE lower(email) = lower($1)`, email))
+		SELECT id, username, password_hash, role, enabled, created_at, last_login_at
+		FROM users WHERE lower(username) = lower($1)`, strings.TrimSpace(username)))
 }
 
 // GetUser looks a user up by ID.
 func (s *Store) GetUser(ctx context.Context, id string) (User, error) {
 	return s.scanUser(s.pool.QueryRow(ctx, `
-		SELECT id, email, password_hash, role, enabled, created_at, last_login_at
+		SELECT id, username, password_hash, role, enabled, created_at, last_login_at
 		FROM users WHERE id = $1`, id))
 }
 
 // ListUsers returns every account.
 func (s *Store) ListUsers(ctx context.Context) ([]User, error) {
 	rows, err := s.pool.Query(ctx, `
-		SELECT id, email, password_hash, role, enabled, created_at, last_login_at
-		FROM users ORDER BY email`)
+		SELECT id, username, password_hash, role, enabled, created_at, last_login_at
+		FROM users ORDER BY lower(username)`)
 	if err != nil {
 		return nil, fmt.Errorf("store: list users: %w", err)
 	}
@@ -185,7 +216,7 @@ func (s *Store) AppAccess(ctx context.Context, userID string) ([]string, error) 
 func (s *Store) scanUser(row scanner) (User, error) {
 	var u User
 	var role string
-	err := row.Scan(&u.ID, &u.Email, &u.PasswordHash, &role, &u.Enabled, &u.CreatedAt, &u.LastLoginAt)
+	err := row.Scan(&u.ID, &u.Username, &u.PasswordHash, &role, &u.Enabled, &u.CreatedAt, &u.LastLoginAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return User{}, ErrNotFound
 	}

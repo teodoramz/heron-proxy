@@ -7,7 +7,7 @@ interface AuthState {
   user: User | null
   apps: string[]
   loading: boolean
-  signIn: (email: string, password: string) => Promise<void>
+  signIn: (username: string, password: string) => Promise<void>
   signOut: () => Promise<void>
   atLeast: (role: Role) => boolean
 }
@@ -31,8 +31,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .finally(() => setLoading(false))
   }, [])
 
-  const signIn = useCallback(async (email: string, password: string) => {
-    const res = await api.login(email, password)
+  const signIn = useCallback(async (username: string, password: string) => {
+    const res = await api.login(username, password)
     setUser(res.user)
     const me = await api.me()
     setApps(me.apps ?? [])

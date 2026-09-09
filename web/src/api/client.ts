@@ -37,8 +37,8 @@ export function rangeParams(from: Date, to: Date, extra: Record<string, string> 
 }
 
 export const api = {
-  login: (email: string, password: string) =>
-    post<{ user: User; csrf_token: string }>('/api/auth/login', { email, password }),
+  login: (username: string, password: string) =>
+    post<{ user: User; csrf_token: string }>('/api/auth/login', { username, password }),
   logout: () => post<void>('/api/auth/logout'),
   me: () => request<{ user: User; apps: string[] }>('/api/me'),
 
@@ -109,7 +109,7 @@ export const api = {
   schema: () => request<{ fields: FieldSchema[]; max_limit: number }>('/api/filters/schema'),
 
   users: () => request<{ users: User[] }>('/api/users'),
-  createUser: (body: { email: string; password: string; role: string; apps?: string[] }) =>
+  createUser: (body: { username: string; password: string; role: string; apps?: string[] }) =>
     post<User>('/api/users', body),
   updateUser: (id: string, body: Record<string, unknown>) =>
     request<void>(`/api/users/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),

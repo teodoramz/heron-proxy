@@ -20,7 +20,7 @@ import requests
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # Hostnames the lab serves. Anything else is refused.
-LAB_HOSTS = ("shop.local", "api.local", "blog.local", "demo.local", "lab.local")
+LAB_HOSTS = ("shop.local", "api.local", "blog.local", "demo.local", "fresh.local", "lab.local")
 
 DEFAULT_ADDR = "127.0.0.1"
 DEFAULT_PORT = 8443

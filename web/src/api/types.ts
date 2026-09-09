@@ -2,7 +2,7 @@ export type Role = 'admin' | 'analyst' | 'viewer'
 
 export interface User {
   id: string
-  email: string
+  username: string
   role: Role
   enabled: boolean
   created_at: string

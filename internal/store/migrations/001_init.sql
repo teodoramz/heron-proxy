@@ -32,7 +32,7 @@ CREATE INDEX IF NOT EXISTS certificates_app_id_idx ON certificates (app_id);
 
 CREATE TABLE IF NOT EXISTS users (
     id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    email         TEXT NOT NULL UNIQUE,
+    username      TEXT NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
     role          TEXT NOT NULL CHECK (role IN ('admin', 'analyst', 'viewer')),
     enabled       BOOLEAN NOT NULL DEFAULT TRUE,

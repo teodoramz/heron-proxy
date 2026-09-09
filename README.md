@@ -62,7 +62,7 @@ $EDITOR deploy/compose/.env     # every value needs changing
 make up
 ```
 
-The UI is on <http://localhost:8081>. Sign in with the `ADMIN_EMAIL` and
+The UI is on <http://localhost:8081>. Sign in with the `ADMIN_USERNAME` and
 `ADMIN_PASSWORD` you set; that account is created on first start only.
 
 Then, in the UI:

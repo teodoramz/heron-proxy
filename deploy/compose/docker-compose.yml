@@ -52,7 +52,7 @@ services:
       API_PROXY_STREAM_URL: ws://proxy:9090/internal/stream
       API_SECURE_COOKIES: ${API_SECURE_COOKIES:-false}
       BLOB_DIR: /data/blobs
-      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      ADMIN_USERNAME: ${ADMIN_USERNAME}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
     volumes:
       - blobs:/data/blobs

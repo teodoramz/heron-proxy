@@ -3,7 +3,7 @@ import { useAuth } from '../hooks/useAuth'
 
 export function Login() {
   const { signIn } = useAuth()
-  const [email, setEmail] = useState('')
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -13,9 +13,9 @@ export function Login() {
     setBusy(true)
     setError('')
     try {
-      await signIn(email, password)
+      await signIn(username, password)
     } catch {
-      setError('That email and password do not match an account.')
+      setError('That username and password do not match an account.')
     } finally {
       setBusy(false)
     }
@@ -30,14 +30,16 @@ export function Login() {
         {error && <p className="error-msg">{error}</p>}
 
         <div className="field">
-          <label htmlFor="email">Email</label>
+          <label htmlFor="username">Username</label>
           <input
-            id="email"
+            id="username"
             className="input"
-            type="email"
             autoComplete="username"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
             required
           />
         </div>
