@@ -87,12 +87,13 @@ func run(log *slog.Logger) error {
 	go alerts.New(hub, db, log).Run(ctx)
 
 	handler := &handlers.Handler{
-		Reader: reader.New(ch.Conn()),
-		Store:  db,
-		Blobs:  blob.New(cfg.Storage.BlobDir),
-		Auth:   middleware,
-		Tail:   hub,
-		Logger: log,
+		Reader:         reader.New(ch.Conn()),
+		Store:          db,
+		Blobs:          blob.New(cfg.Storage.BlobDir),
+		Auth:           middleware,
+		Tail:           hub,
+		Logger:         log,
+		AllowedOrigins: cfg.API.AllowedOrigins,
 	}
 	srv := &http.Server{
 		Addr:              cfg.API.ListenAddr,

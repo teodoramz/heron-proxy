@@ -46,7 +46,7 @@ Postgres and is edited in the UI.
 | `API_LISTEN_ADDR` | `:8080` | HTTP listener. |
 | `API_SESSION_TTL` | `12h` | Session lifetime. |
 | `API_SECURE_COOKIES` | `false` | Set `true` when the UI is served over HTTPS. |
-| `API_ALLOWED_ORIGINS` | — | Comma-separated origins for cross-origin use. Same-origin needs none. |
+| `API_ALLOWED_ORIGINS` | — | Comma-separated origins for cross-origin use, for both CORS and the live-tail websocket. Same-origin needs none. |
 | `API_PROXY_STREAM_URL` | `ws://proxy:9090/internal/stream` | Where live tail reads from. |
 | `SESSION_KEY` | random | Signs session cookies. Unset means everyone is signed out on restart. |
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | — | Creates the first administrator, on first start only. |

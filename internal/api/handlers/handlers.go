@@ -29,6 +29,10 @@ type Handler struct {
 	Auth   *auth.Middleware
 	Tail   *tail.Hub
 	Logger *slog.Logger
+
+	// AllowedOrigins are the cross-origin sites permitted to open the live-tail
+	// websocket. Same-origin is always allowed and needs no entry here.
+	AllowedOrigins []string
 }
 
 // filterFromRequest decodes a filter from the body (POST) or query string (GET)

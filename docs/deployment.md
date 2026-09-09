@@ -50,6 +50,12 @@ If a trusted proxy does sit in front, add its address range to the app's
 The UI is a separate concern: serve `web` behind your own TLS and set
 `API_SECURE_COOKIES=true`.
 
+If you serve the UI from a different origin than the API, list that origin in
+`API_ALLOWED_ORIGINS`. It governs both CORS and the live-tail websocket, which
+authorizes by `Origin` because a websocket handshake cannot carry a CSRF header.
+Leaving it unset keeps the deployment same-origin, which is how the compose
+stack serves it.
+
 ## Kubernetes
 
 ```bash

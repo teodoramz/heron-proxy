@@ -24,6 +24,11 @@ type Options struct {
 // analysis actions need analyst, and configuration needs admin.
 func NewRouter(o Options) http.Handler {
 	h := o.Handler
+	// The websocket route authorizes by Origin, so it needs the same list the
+	// CORS middleware uses. Keeping them in step here stops them drifting.
+	if h.AllowedOrigins == nil {
+		h.AllowedOrigins = o.AllowedOrigins
+	}
 	mux := http.NewServeMux()
 
 	// Unauthenticated.

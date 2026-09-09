@@ -53,10 +53,15 @@ func (a *Admin) metrics(w http.ResponseWriter, _ *http.Request) {
 	_ = json.NewEncoder(w).Encode(stats)
 }
 
+// upgrader rejects any handshake carrying an Origin header. The only client of
+// this endpoint is the API service, which sends none; a browser always sends
+// one. The bearer token below is the primary control, since a browser cannot
+// set Authorization on a websocket handshake, but refusing browser origins
+// outright removes the question.
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 32 << 10,
-	CheckOrigin:     func(*http.Request) bool { return true },
+	CheckOrigin:     func(r *http.Request) bool { return r.Header.Get("Origin") == "" },
 }
 
 // stream pushes every recorded event to the API for live tail.

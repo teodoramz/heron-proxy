@@ -1,7 +1,11 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
+	"net/url"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -10,10 +14,42 @@ import (
 	"github.com/amzteodor/proxy-waf/internal/store"
 )
 
+// upgrader authorizes the handshake by Origin. This is the only cross-site
+// defense on this route: a WebSocket handshake is a GET that cannot carry a
+// custom header, so the CSRF middleware deliberately does not apply to it.
+// Without an Origin check, any page a signed-in analyst visits could open this
+// socket with their session cookie and stream every recorded request.
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 32 << 10,
-	CheckOrigin:     func(*http.Request) bool { return true },
+	CheckOrigin:     func(r *http.Request) bool { return originAllowed(r, allowedOrigins(r)) },
+}
+
+// originAllowed permits same-origin handshakes and any origin the operator has
+// configured. Browsers always send Origin on a WebSocket handshake, so a
+// missing one is rejected rather than trusted.
+func originAllowed(r *http.Request, allowed []string) bool {
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		return false
+	}
+	u, err := url.Parse(origin)
+	if err != nil || u.Host == "" {
+		return false
+	}
+	if strings.EqualFold(u.Host, r.Host) {
+		return true
+	}
+	return slices.ContainsFunc(allowed, func(a string) bool { return strings.EqualFold(a, origin) })
+}
+
+type originsKey struct{}
+
+// allowedOrigins reads the configured origins that withOrigins placed on the
+// request, so the upgrader's CheckOrigin callback can reach them.
+func allowedOrigins(r *http.Request) []string {
+	v, _ := r.Context().Value(originsKey{}).([]string)
+	return v
 }
 
 // Stream pushes matching events to the client as they are recorded. The filter
@@ -33,6 +69,12 @@ func (h *Handler) Stream(w http.ResponseWriter, r *http.Request) {
 	s := session(r)
 	if h.Tail == nil {
 		writeError(w, http.StatusServiceUnavailable, "live tail unavailable")
+		return
+	}
+	// Checked here as well as in the upgrader so the caller gets a clear reason.
+	r = r.WithContext(context.WithValue(r.Context(), originsKey{}, h.AllowedOrigins))
+	if !originAllowed(r, h.AllowedOrigins) {
+		writeError(w, http.StatusForbidden, "origin not allowed")
 		return
 	}
 
