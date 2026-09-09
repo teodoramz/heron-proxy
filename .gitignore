@@ -7,3 +7,4 @@ spool/
 .env
 *.key
 *.pem
+deploy/compose/.env

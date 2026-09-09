@@ -1,0 +1,111 @@
+name: proxy-waf
+
+services:
+  proxy:
+    build:
+      context: ../..
+      dockerfile: Dockerfile.proxy
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
+      clickhouse: { condition: service_healthy }
+      api: { condition: service_healthy }
+    ports:
+      - "${PROXY_HTTP_PORT:-80}:80"
+      - "${PROXY_HTTPS_PORT:-443}:443"
+    environment:
+      POSTGRES_DSN: postgres://proxywaf:${POSTGRES_PASSWORD}@postgres:5432/proxywaf?sslmode=disable
+      CLICKHOUSE_DSN: clickhouse://default:${CLICKHOUSE_PASSWORD}@clickhouse:9000/proxywaf
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      INTERNAL_STREAM_TOKEN: ${INTERNAL_STREAM_TOKEN}
+      SPOOL_DIR: /data/spool
+      BLOB_DIR: /data/blobs
+      PROXY_RULES_DIR: /rules
+      GEOIP_CITY_DB: ${GEOIP_CITY_DB:-}
+      GEOIP_ASN_DB: ${GEOIP_ASN_DB:-}
+      PIPELINE_BLOCK_ON_FULL: ${PIPELINE_BLOCK_ON_FULL:-false}
+      SPOOL_MAX_BYTES: ${SPOOL_MAX_BYTES:-10737418240}
+    volumes:
+      - spool:/data/spool
+      - blobs:/data/blobs
+      - ../../rules:/rules:ro
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:9090/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  api:
+    build:
+      context: ../..
+      dockerfile: Dockerfile.api
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
+      clickhouse: { condition: service_healthy }
+    environment:
+      POSTGRES_DSN: postgres://proxywaf:${POSTGRES_PASSWORD}@postgres:5432/proxywaf?sslmode=disable
+      CLICKHOUSE_DSN: clickhouse://default:${CLICKHOUSE_PASSWORD}@clickhouse:9000/proxywaf
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      SESSION_KEY: ${SESSION_KEY}
+      INTERNAL_STREAM_TOKEN: ${INTERNAL_STREAM_TOKEN}
+      API_PROXY_STREAM_URL: ws://proxy:9090/internal/stream
+      API_SECURE_COOKIES: ${API_SECURE_COOKIES:-false}
+      BLOB_DIR: /data/blobs
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+    volumes:
+      - blobs:/data/blobs
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  web:
+    build:
+      context: ../..
+      dockerfile: Dockerfile.web
+    restart: unless-stopped
+    depends_on:
+      api: { condition: service_started }
+    ports:
+      - "${WEB_PORT:-8081}:8081"
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: proxywaf
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: proxywaf
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U proxywaf -d proxywaf"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8-alpine
+    restart: unless-stopped
+    environment:
+      CLICKHOUSE_DB: proxywaf
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    ulimits:
+      nofile: { soft: 262144, hard: 262144 }
+    volumes:
+      - chdata:/var/lib/clickhouse
+    healthcheck:
+      test: ["CMD-SHELL", "clickhouse-client --password $$CLICKHOUSE_PASSWORD -q 'SELECT 1'"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  spool:
+  blobs:
+  pgdata:
+  chdata:
