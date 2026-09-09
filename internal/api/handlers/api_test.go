@@ -1,9 +1,13 @@
 package handlers_test
 
 import (
+	"context"
+	"io"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/amzteodor/proxy-waf/internal/store"
 )
@@ -765,5 +769,77 @@ func TestUpdateDoesNotResetOmittedFields(t *testing.T) {
 	}
 	if got.WAF.ParanoiaLevel != 3 || got.WAF.Threshold != 9 {
 		t.Errorf("waf policy reset by a partial update: %+v", got.WAF)
+	}
+}
+
+// TestReplayAcceptsRawRequest checks the repeater path: a hand-edited request
+// is parsed and sent, rather than only the recorded one being replayed.
+func TestReplayAcceptsRawRequest(t *testing.T) {
+	h := newHarness(t)
+	c := h.login(t, "admin@example.test", store.RoleAdmin, nil)
+
+	seen := make(chan *http.Request, 1)
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		r.Body = io.NopCloser(strings.NewReader(string(body)))
+		r.Header.Set("X-Captured-Body", string(body))
+		seen <- r
+		w.WriteHeader(http.StatusAccepted)
+	}))
+	defer upstream.Close()
+
+	// Point the event's app at the stub so replay has somewhere to send.
+	app, err := h.store.GetApp(context.Background(), "api")
+	if err != nil {
+		t.Fatal(err)
+	}
+	app.UpstreamURL = upstream.URL
+	if err := h.store.SaveApp(context.Background(), app); err != nil {
+		t.Fatal(err)
+	}
+
+	raw := "PUT /edited/path?changed=yes HTTP/1.1\r\n" +
+		"Host: api.example\r\n" +
+		"X-Custom: from-the-editor\r\n" +
+		"Content-Type: text/plain\r\n" +
+		"\r\n" +
+		"a body typed by hand"
+
+	var out map[string]any
+	c.decode(c.do(http.MethodPost, "/api/traffic/"+h.events[0].ID+"/replay",
+		map[string]any{"raw": raw}), http.StatusOK, &out)
+
+	select {
+	case got := <-seen:
+		if got.Method != http.MethodPut {
+			t.Errorf("method = %s, want PUT", got.Method)
+		}
+		if got.URL.Path != "/edited/path" || got.URL.RawQuery != "changed=yes" {
+			t.Errorf("target = %s?%s", got.URL.Path, got.URL.RawQuery)
+		}
+		if got.Header.Get("X-Custom") != "from-the-editor" {
+			t.Errorf("edited header not sent: %v", got.Header)
+		}
+		if got.Header.Get("X-Captured-Body") != "a body typed by hand" {
+			t.Errorf("edited body not sent: %q", got.Header.Get("X-Captured-Body"))
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("the upstream never received the replayed request")
+	}
+
+	if int(out["status"].(float64)) != http.StatusAccepted {
+		t.Errorf("reported status = %v", out["status"])
+	}
+}
+
+func TestReplayRejectsUnparseableRaw(t *testing.T) {
+	h := newHarness(t)
+	c := h.login(t, "admin@example.test", store.RoleAdmin, nil)
+
+	resp := c.do(http.MethodPost, "/api/traffic/"+h.events[0].ID+"/replay",
+		map[string]any{"raw": "this is not an HTTP request"})
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("status = %d, want 400", resp.StatusCode)
 	}
 }

@@ -299,10 +299,18 @@ function ClientTab({ detail }: { detail: EventDetail }) {
 function ReplayTab({ detail }: { detail: EventDetail }) {
   const { atLeast } = useAuth()
   const [target, setTarget] = useState('')
-  const [body, setBody] = useState(detail.body ?? '')
+  const [raw, setRaw] = useState('')
   const [result, setResult] = useState<ReplayResult | null>(null)
   const [error, setError] = useState('')
   const [sending, setSending] = useState(false)
+
+  // Load the recorded request as text, which is what gets edited and sent.
+  useEffect(() => {
+    api
+      .exportEvent(detail.id, 'raw')
+      .then(setRaw)
+      .catch(() => setRaw(`${detail.method} ${detail.path} HTTP/1.1\r\nHost: ${detail.host}\r\n\r\n`))
+  }, [detail.id, detail.method, detail.path, detail.host])
 
   if (!atLeast('analyst')) return <p className="muted">Replay needs the analyst role.</p>
 
@@ -310,7 +318,7 @@ function ReplayTab({ detail }: { detail: EventDetail }) {
     setSending(true)
     setError('')
     try {
-      setResult(await api.replay(detail.id, { target: target || undefined, body }))
+      setResult(await api.replay(detail.id, { raw, target: target || undefined }))
     } catch (e) {
       setError((e as Error).message)
     } finally {
@@ -320,43 +328,69 @@ function ReplayTab({ detail }: { detail: EventDetail }) {
 
   return (
     <>
-      <p className="muted" style={{ marginTop: 0 }}>
-        The request is sent to this app's upstream. Admins may override the target.
+      <p className="hint" style={{ marginTop: 0 }}>
+        Edit the request and send it again. The request line, headers and body are all yours to
+        change; Content-Length is recalculated on send, so you do not need to keep it correct.
       </p>
+
       <div className="field">
-        <label htmlFor="replay-target">Target (optional)</label>
+        <label htmlFor="replay-target">Send to</label>
         <input
           id="replay-target"
           className="input"
-          placeholder={detail.upstream || 'the app upstream'}
+          placeholder={detail.upstream || "this app's upstream"}
           value={target}
           onChange={(e) => setTarget(e.target.value)}
         />
+        <span className="why muted">
+          Leave empty to use the app's own upstream. A different target needs the admin role, and
+          private or link-local addresses are refused. The path comes from the request below, so put
+          only the scheme, host and port here, such as <code>https://10.0.0.5:8443</code>.
+        </span>
       </div>
+
       <div className="field">
-        <label htmlFor="replay-body">Body</label>
+        <label htmlFor="replay-raw">Request</label>
         <textarea
-          id="replay-body"
+          id="replay-raw"
           className="textarea"
-          rows={6}
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
+          rows={16}
+          spellCheck={false}
+          value={raw}
+          onChange={(e) => setRaw(e.target.value)}
         />
+        <span className="why muted">
+          The Host header here is what the upstream sees. The source address is the proxy's, not the
+          original client's.
+        </span>
       </div>
-      <button className="btn btn-primary" onClick={send} disabled={sending}>
-        {sending ? 'Sending…' : 'Send request'}
-      </button>
+
+      <div className="row">
+        <button className="btn btn-primary" onClick={send} disabled={sending || !raw}>
+          {sending ? 'Sending…' : 'Send request'}
+        </button>
+        <button
+          className="btn"
+          onClick={() => api.exportEvent(detail.id, 'raw').then(setRaw)}
+          disabled={sending}
+        >
+          Reset to the recorded request
+        </button>
+      </div>
 
       {error && <p className="error-msg" style={{ marginTop: 10 }}>{error}</p>}
 
       {result && (
-        <div style={{ marginTop: 14 }}>
+        <div style={{ marginTop: 16 }}>
+          <h3 style={{ fontSize: 13, marginBottom: 6 }}>Response</h3>
           <dl className="kv">
+            <dt>Sent to</dt>
+            <dd>{result.url}</dd>
             <dt>Status</dt>
             <dd className={statusClass(result.status)}>
               {result.status}
               {result.diff.status_changed && (
-                <span className="muted"> (was {result.diff.status_from})</span>
+                <span className="muted"> · recorded response was {result.diff.status_from}</span>
               )}
             </dd>
             <dt>Time</dt>
@@ -364,10 +398,18 @@ function ReplayTab({ detail }: { detail: EventDetail }) {
             <dt>Size change</dt>
             <dd>
               {result.diff.size_delta >= 0 ? '+' : ''}
-              {result.diff.size_delta} bytes
+              {result.diff.size_delta} bytes against the recording
             </dd>
           </dl>
-          <pre className="code">{result.body}</pre>
+
+          <h4 style={{ fontSize: 12, margin: '12px 0 4px' }}>Headers</h4>
+          <Headers map={result.headers} />
+
+          <h4 style={{ fontSize: 12, margin: '12px 0 4px' }}>Body</h4>
+          <pre className="code">
+            {result.body || '(empty)'}
+            {result.truncated && '\n… truncated'}
+          </pre>
         </div>
       )}
     </>

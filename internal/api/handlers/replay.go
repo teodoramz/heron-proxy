@@ -16,7 +16,12 @@ import (
 )
 
 // ReplayRequest describes a request to send, based on a recorded event.
+//
+// Raw is the whole request as typed by an analyst: request line, headers, blank
+// line, body. When present it supersedes Method, Path, Query, Headers and Body,
+// which remain for callers that would rather change one field.
 type ReplayRequest struct {
+	Raw      string            `json:"raw,omitempty"`
 	Method   string            `json:"method,omitempty"`
 	Target   string            `json:"target,omitempty"`
 	Path     string            `json:"path,omitempty"`
@@ -66,6 +71,19 @@ func (h *Handler) Replay(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	if req.Raw != "" {
+		parsed, err := parseRawRequest(req.Raw)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		req.Method = parsed.Method
+		req.Path, req.Query = splitTarget(parsed.Target)
+		req.Headers = parsed.Headers
+		req.Body = parsed.Body
+		req.NoBody = parsed.Body == ""
+	}
+
 	e, err := h.Reader.Get(r.Context(), r.PathValue("id"))
 	if err != nil {
 		writeError(w, http.StatusNotFound, "event not found")
