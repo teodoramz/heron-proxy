@@ -62,8 +62,12 @@ func (r *Reader) List(ctx context.Context, f query.Filter) (Page, error) {
 		page.HasMore = true
 	}
 	if len(page.Events) > 0 {
-		last := page.Events[len(page.Events)-1]
-		page.NextCursor = query.EncodeCursor(query.Cursor{TS: last.TS, ID: last.ID})
+		last := &page.Events[len(page.Events)-1]
+		cursor := query.Cursor{TS: last.TS, ID: last.ID}
+		if f.Sort != "" && f.Sort != "ts" {
+			cursor.Sort = query.SortValue(f.Sort, last)
+		}
+		page.NextCursor = query.EncodeCursor(cursor)
 	}
 	return page, nil
 }

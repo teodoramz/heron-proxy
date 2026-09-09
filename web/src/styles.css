@@ -646,6 +646,27 @@ table.data td.num { text-align: right; }
 .thead > div { position: relative; }
 .th-label { display: block; overflow: hidden; text-overflow: ellipsis; }
 
+.th-sort {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cell-num .th-sort { justify-content: flex-end; }
+.th-sort:hover { color: var(--text); }
+.th-sort.on { color: var(--accent); }
+.th-arrow { font-size: 9px; line-height: 1; }
+
 .th-resize {
   position: absolute;
   top: 0;

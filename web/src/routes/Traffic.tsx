@@ -37,6 +37,8 @@ function initialFilter(params: URLSearchParams, limit: number): Filter {
     apps: app ? [app] : undefined,
     root: { op: 'and', conditions },
     limit,
+    sort: 'ts',
+    order: 'desc',
   }
 }
 
@@ -85,6 +87,16 @@ export function Traffic() {
       return next
     })
   }
+
+  // Clicking a header sorts by it; clicking the one already sorted reverses it.
+  // Either way paging restarts, since the cursor belongs to the old ordering.
+  const sortBy = useCallback((field: string) => {
+    setFilter((prev) =>
+      prev.sort === field
+        ? { ...prev, order: prev.order === 'asc' ? 'desc' : 'asc', cursor: undefined }
+        : { ...prev, sort: field, order: 'desc', cursor: undefined },
+    )
+  }, [])
 
   const refresh = useCallback(() => setReloadToken((n) => n + 1), [])
 
@@ -178,6 +190,9 @@ export function Traffic() {
         selectedId={selected}
         loading={loading}
         onSelect={(e) => setSelected(e.id)}
+        sort={filter.sort ?? 'ts'}
+        order={filter.order ?? 'desc'}
+        onSort={sortBy}
       />
       <Pager
         page={page}

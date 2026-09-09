@@ -132,7 +132,12 @@ type Filter struct {
 	Root   Group     `json:"root"`
 	Limit  int       `json:"limit,omitempty"`
 	Cursor string    `json:"cursor,omitempty"`
-	Order  string    `json:"order,omitempty"`
+
+	// Sort names the column to order by. Paging stays keyset whatever it is:
+	// the sort column is carried in the cursor alongside the timestamp and id,
+	// which together are unique and so keep the ordering total.
+	Sort  string `json:"sort,omitempty"`
+	Order string `json:"order,omitempty"`
 }
 
 // MaxLimit caps a single page.
@@ -157,6 +162,9 @@ func (f *Filter) Normalize() {
 	}
 	if !strings.EqualFold(f.Order, "asc") {
 		f.Order = "desc"
+	}
+	if _, ok := sortable(f.Sort); !ok {
+		f.Sort = "ts"
 	}
 	if f.To.IsZero() {
 		f.To = time.Now().UTC().Add(time.Minute)
@@ -229,6 +237,41 @@ func (c Condition) validate() error {
 		}
 	}
 	return nil
+}
+
+// notInList names the columns the list projection leaves out. Sorting by one
+// would build a cursor from a value the rows never carried, so the keyset
+// predicate would compare against an empty value and repeat rows.
+var notInList = map[string]bool{
+	"as_org": true,
+	"body":   true, // the list carries a preview, not the whole body
+}
+
+// sortable reports whether a field can be ordered by, and the column to use.
+// Maps and arrays have no single value per row, and a column the list does not
+// return cannot anchor a cursor.
+func sortable(field string) (column, bool) {
+	col, ok := columns[field]
+	if !ok || notInList[field] {
+		return column{}, false
+	}
+	switch col.kind {
+	case kMap, kArrUInt32, kArrString:
+		return column{}, false
+	}
+	return col, true
+}
+
+// SortableFields lists the fields the table can be ordered by.
+func SortableFields() []string {
+	out := make([]string, 0, len(columns))
+	for name := range columns {
+		if _, ok := sortable(name); ok {
+			out = append(out, name)
+		}
+	}
+	sort.Strings(out)
+	return out
 }
 
 // Fields returns every filterable field name.

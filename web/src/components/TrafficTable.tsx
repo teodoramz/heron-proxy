@@ -1,6 +1,6 @@
 import { useCallback, useLayoutEffect, useRef, useState } from 'react'
 import type { TrafficEvent } from '../api/types'
-import { COLUMNS_BY_ID, trackFor, type ColumnDef, type WidthMode } from './columns'
+import { COLUMNS_BY_ID, sortFieldFor, trackFor, type ColumnDef, type WidthMode } from './columns'
 import { anomalyLevel } from './format'
 
 const ROW_HEIGHT = 30
@@ -16,6 +16,9 @@ interface Props {
   selectedId?: string
   loading: boolean
   onSelect: (e: TrafficEvent) => void
+  sort: string
+  order: 'asc' | 'desc'
+  onSort: (field: string) => void
 }
 
 
@@ -34,6 +37,9 @@ export function TrafficTable({
   selectedId,
   loading,
   onSelect,
+  sort,
+  order,
+  onSort,
 }: Props) {
   const viewport = useRef<HTMLDivElement>(null)
   const [range, setRange] = useState({ start: 0, end: 60 })
@@ -102,7 +108,15 @@ export function TrafficTable({
     return (
       <div className="table-wrap">
         <div className="table-inner">
-          <Header defs={defs} template={template} widths={widths} onResize={onResize} />
+          <Header
+            defs={defs}
+            template={template}
+            widths={widths}
+            onResize={onResize}
+            sort={sort}
+            order={order}
+            onSort={onSort}
+          />
         </div>
         <p className="empty">
           <strong>No traffic matches this filter</strong>
@@ -123,7 +137,15 @@ export function TrafficTable({
       onWheel={onWheel}
     >
       <div className="table-inner">
-        <Header defs={defs} template={template} widths={widths} onResize={onResize} />
+        <Header
+          defs={defs}
+          template={template}
+          widths={widths}
+          onResize={onResize}
+          sort={sort}
+          order={order}
+          onSort={onSort}
+        />
         <div style={{ height: range.start * ROW_HEIGHT }} />
         {slice.map((e) => (
           <Row
@@ -147,21 +169,47 @@ function Header({
   template,
   widths,
   onResize,
+  sort,
+  order,
+  onSort,
 }: {
   defs: ColumnDef[]
   template: string
   widths: Record<string, number>
   onResize: (id: string, width: number) => void
+  sort: string
+  order: 'asc' | 'desc'
+  onSort: (field: string) => void
 }) {
   return (
     <div className="thead" style={{ gridTemplateColumns: template }}>
       <div />
-      {defs.map((c) => (
-        <div key={c.id} className={c.align === 'right' ? 'cell-num' : undefined}>
-          <span className="th-label">{c.label}</span>
-          <ResizeHandle id={c.id} widths={widths} onResize={onResize} />
-        </div>
-      ))}
+      {defs.map((c) => {
+        const field = sortFieldFor(c)
+        const active = field !== null && field === sort
+        return (
+          <div key={c.id} className={c.align === 'right' ? 'cell-num' : undefined}>
+            {field ? (
+              <button
+                type="button"
+                className={`th-sort${active ? ' on' : ''}`}
+                onClick={() => onSort(field)}
+                title={
+                  active
+                    ? `Sorted ${order === 'asc' ? 'lowest first' : 'highest first'} — click to reverse`
+                    : `Sort by ${c.label.toLowerCase()}`
+                }
+              >
+                {c.label}
+                <span className="th-arrow">{active ? (order === 'asc' ? '▲' : '▼') : ''}</span>
+              </button>
+            ) : (
+              <span className="th-label">{c.label}</span>
+            )}
+            <ResizeHandle id={c.id} widths={widths} onResize={onResize} />
+          </div>
+        )
+      })}
     </div>
   )
 }

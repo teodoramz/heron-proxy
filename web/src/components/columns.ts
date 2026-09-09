@@ -4,6 +4,12 @@ import { bytes, clockTime, duration, statusClass } from './format'
 export interface ColumnDef {
   id: string
   label: string
+  /**
+   * The filter field this column orders by. Null means the column cannot be
+   * sorted: an array has no single value per row, and a column the list query
+   * does not return cannot anchor a cursor.
+   */
+  sort?: string | null
   /** Grid width. A fraction unit lets the column absorb spare space. */
   width: string
   align?: 'right'
@@ -16,15 +22,15 @@ export interface ColumnDef {
 const dim = () => 'cell-dim'
 
 export const COLUMNS: ColumnDef[] = [
-  { id: 'time', label: 'Time', width: '104px', value: (e) => clockTime(e.ts), className: dim },
-  { id: 'date', label: 'Date', width: '84px', value: (e) => e.ts.slice(0, 10), className: dim },
-  { id: 'app', label: 'App', width: '90px', value: (e) => e.app_id || '—', className: dim },
+  { id: 'time', sort: 'ts', label: 'Time', width: '104px', value: (e) => clockTime(e.ts), className: dim },
+  { id: 'date', sort: 'ts', label: 'Date', width: '84px', value: (e) => e.ts.slice(0, 10), className: dim },
+  { id: 'app', sort: 'app_id', label: 'App', width: '90px', value: (e) => e.app_id || '—', className: dim },
   { id: 'method', label: 'Method', width: '62px', value: (e) => e.method },
   { id: 'host', label: 'Host', width: '150px', value: (e) => e.host },
   { id: 'path', label: 'Path', width: 'minmax(220px, 2fr)', value: (e) => e.path },
   { id: 'query', label: 'Query', width: 'minmax(140px, 1fr)', value: (e) => e.query || '—', className: dim },
   {
-    id: 'body',
+    id: 'body', sort: null,
     label: 'Request body',
     width: 'minmax(220px, 2fr)',
     value: (e) =>
@@ -57,7 +63,7 @@ export const COLUMNS: ColumnDef[] = [
     className: (e) => statusClass(e.status),
   },
   {
-    id: 'anomaly',
+    id: 'anomaly', sort: 'anomaly_score',
     label: 'Score',
     width: '58px',
     align: 'right',
@@ -74,25 +80,25 @@ export const COLUMNS: ColumnDef[] = [
     className: (e) => (e.would_block ? 'block-flag' : 'cell-dim'),
   },
   {
-    id: 'rules',
+    id: 'rules', sort: null,
     label: 'Rules',
     width: 'minmax(120px, 1fr)',
     value: (e) => (e.rule_ids?.length ? e.rule_ids.join(' ') : '—'),
     className: (e) => (e.rule_ids?.length ? '' : 'cell-dim'),
   },
   {
-    id: 'tags',
+    id: 'tags', sort: null,
     label: 'Tags',
     width: 'minmax(140px, 1fr)',
     value: (e) => (e.rule_tags?.length ? e.rule_tags.filter((t) => t.startsWith('attack-')).join(' ') || e.rule_tags.join(' ') : '—'),
     className: dim,
   },
-  { id: 'duration', label: 'Took', width: '78px', align: 'right', value: (e) => duration(e.duration_ms), className: dim },
+  { id: 'duration', sort: 'duration_ms', label: 'Took', width: '78px', align: 'right', value: (e) => duration(e.duration_ms), className: dim },
   { id: 'upstream_ms', label: 'Upstream', width: '76px', align: 'right', value: (e) => duration(e.upstream_ms), className: dim },
   { id: 'waf_ms', label: 'WAF', width: '62px', align: 'right', value: (e) => duration(e.waf_ms), className: dim },
-  { id: 'req_size', label: 'Req size', width: '76px', align: 'right', value: (e) => bytes(e.req_body_size), className: dim },
+  { id: 'req_size', sort: 'req_body_size', label: 'Req size', width: '76px', align: 'right', value: (e) => bytes(e.req_body_size), className: dim },
   { id: 'resp_size', label: 'Resp size', width: '80px', align: 'right', value: (e) => bytes(e.resp_size), className: dim },
-  { id: 'content_type', label: 'Type', width: '130px', value: (e) => e.resp_content_type || '—', className: dim },
+  { id: 'content_type', sort: 'resp_content_type', label: 'Type', width: '130px', value: (e) => e.resp_content_type || '—', className: dim },
   { id: 'user_agent', label: 'User agent', width: 'minmax(200px, 2fr)', value: (e) => e.user_agent || '—', className: dim },
   { id: 'ja4', label: 'JA4', width: '300px', value: (e) => e.ja4 || '—', className: dim },
   { id: 'ja3', label: 'JA3', width: '260px', value: (e) => e.ja3 || '—', className: dim },
@@ -186,4 +192,11 @@ export function saveWidthMode(mode: WidthMode): void {
   } catch {
     // A browser with storage blocked simply loses the preference.
   }
+}
+
+
+/** sortFieldFor returns the filter field a column orders by, or null if it
+ *  cannot be sorted. A column without an explicit mapping sorts by its own id. */
+export function sortFieldFor(c: ColumnDef): string | null {
+  return c.sort === undefined ? c.id : c.sort
 }

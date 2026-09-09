@@ -111,6 +111,7 @@ export interface Filter {
   root: Group
   limit?: number
   cursor?: string
+  sort?: string
   order?: 'asc' | 'desc'
 }
 

@@ -229,6 +229,30 @@ func matchIP(have netip.Addr, c Condition) bool {
 	return false
 }
 
+// SortValue returns the value of a sortable field for an event, so a cursor can
+// be built for the next page. It mirrors the column the query orders by.
+func SortValue(field string, e *event.Event) any {
+	col, ok := sortable(field)
+	if !ok {
+		return nil
+	}
+	switch col.kind {
+	case kUInt:
+		return uintField(e, col.name)
+	case kBool:
+		if boolField(e, col.name) {
+			return 1
+		}
+		return 0
+	case kIP:
+		return ipField(e, col.name).String()
+	case kDateTime:
+		return e.TS
+	default:
+		return stringField(e, col.name)
+	}
+}
+
 // Field accessors keep the matcher aligned with the SQL column names.
 
 func stringField(e *event.Event, col string) string {

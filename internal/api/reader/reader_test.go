@@ -631,3 +631,133 @@ func TestListReturnsBodyPreview(t *testing.T) {
 		t.Error("no event carried a body preview")
 	}
 }
+
+// TestSortByEveryColumnPagesCleanly is the guarantee behind clicking a header:
+// whatever the sort, paging must not skip or repeat a row, and the order must
+// hold across page boundaries.
+func TestSortByEveryColumnPagesCleanly(t *testing.T) {
+	r := newReader(t)
+	ctx := context.Background()
+
+	for _, field := range query.SortableFields() {
+		for _, order := range []string{"asc", "desc"} {
+			t.Run(field+"/"+order, func(t *testing.T) {
+				f := fullRange()
+				f.Sort = field
+				f.Order = order
+				f.Limit = 2
+
+				seen := make(map[string]bool)
+				var pages int
+				for {
+					page, err := r.List(ctx, f)
+					if err != nil {
+						t.Fatalf("List: %v", err)
+					}
+					for _, e := range page.Events {
+						if seen[e.ID] {
+							t.Fatalf("event %s returned twice on page %d", e.ID, pages)
+						}
+						seen[e.ID] = true
+					}
+					pages++
+					if !page.HasMore || pages > 10 {
+						break
+					}
+					f.Cursor = page.NextCursor
+				}
+				if len(seen) != 5 {
+					t.Errorf("saw %d of 5 events", len(seen))
+				}
+			})
+		}
+	}
+}
+
+func TestSortOrdersResults(t *testing.T) {
+	r := newReader(t)
+	ctx := context.Background()
+
+	f := fullRange()
+	f.Sort = "status"
+	f.Order = "asc"
+	page, err := r.List(ctx, f)
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	for i := 1; i < len(page.Events); i++ {
+		if page.Events[i].Status < page.Events[i-1].Status {
+			t.Errorf("ascending status broken at %d: %d then %d",
+				i, page.Events[i-1].Status, page.Events[i].Status)
+		}
+	}
+
+	f.Order = "desc"
+	page, _ = r.List(ctx, f)
+	for i := 1; i < len(page.Events); i++ {
+		if page.Events[i].Status > page.Events[i-1].Status {
+			t.Errorf("descending status broken at %d", i)
+		}
+	}
+}
+
+func TestSortByAnomalyFindsTheWorstFirst(t *testing.T) {
+	r := newReader(t)
+	f := fullRange()
+	f.Sort = "anomaly_score"
+	f.Order = "desc"
+
+	page, err := r.List(context.Background(), f)
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	// 15 is the highest score in the fixture.
+	if page.Events[0].AnomalyScore != 15 {
+		t.Errorf("top score = %d, want the highest in the fixture", page.Events[0].AnomalyScore)
+	}
+}
+
+func TestSortByAddress(t *testing.T) {
+	r := newReader(t)
+	f := fullRange()
+	f.Sort = "client_ip"
+	f.Order = "asc"
+	f.Limit = 2
+
+	seen := make(map[string]bool)
+	for range 5 {
+		page, err := r.List(context.Background(), f)
+		if err != nil {
+			t.Fatalf("List: %v", err)
+		}
+		for _, e := range page.Events {
+			if seen[e.ID] {
+				t.Fatalf("duplicate while sorting by address: %s", e.ID)
+			}
+			seen[e.ID] = true
+		}
+		if !page.HasMore {
+			break
+		}
+		f.Cursor = page.NextCursor
+	}
+	if len(seen) != 5 {
+		t.Errorf("saw %d of 5 events", len(seen))
+	}
+}
+
+func TestUnknownSortFallsBackToTime(t *testing.T) {
+	r := newReader(t)
+	f := fullRange()
+	f.Sort = "not_a_column"
+
+	page, err := r.List(context.Background(), f)
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	for i := 1; i < len(page.Events); i++ {
+		if page.Events[i].TS.After(page.Events[i-1].TS) {
+			t.Error("did not fall back to newest-first by time")
+		}
+	}
+}

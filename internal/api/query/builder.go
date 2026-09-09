@@ -3,6 +3,7 @@ package query
 import (
 	"fmt"
 	"net/netip"
+	"strconv"
 	"strings"
 )
 
@@ -48,29 +49,91 @@ func Where(f Filter) (string, []any, error) {
 }
 
 // List renders the paginated traffic query.
+//
+// Ordering is always by the sort column then the timestamp and id. Those last
+// two are unique together, so the order is total and the keyset predicate can
+// never skip or repeat a row, whatever the sort column contains.
 func List(f Filter) (string, []any, error) {
 	f.Normalize()
 	where, args, err := Where(f)
 	if err != nil {
 		return "", nil, err
 	}
+	col, ok := sortable(f.Sort)
+	if !ok {
+		return "", nil, fmt.Errorf("query: cannot sort by %q", f.Sort)
+	}
 	direction := "DESC"
 	compare := "<"
 	if f.Order == "asc" {
 		direction, compare = "ASC", ">"
 	}
+
+	byTime := col.name == "ts"
+	order := fmt.Sprintf("ts %s, id %s", direction, direction)
+	if !byTime {
+		order = fmt.Sprintf("%s %s, %s", col.name, direction, order)
+	}
+
 	if f.Cursor != "" {
 		c, err := DecodeCursor(f.Cursor)
 		if err != nil {
 			return "", nil, err
 		}
-		where += fmt.Sprintf(" AND (ts, id) %s (?, ?)", compare)
-		args = append(args, c.TS, c.ID)
+		if byTime {
+			where += fmt.Sprintf(" AND (ts, id) %s (?, ?)", compare)
+			args = append(args, c.TS, c.ID)
+		} else {
+			value, err := castCursorValue(col, c.Sort)
+			if err != nil {
+				return "", nil, err
+			}
+			where += fmt.Sprintf(" AND (%s, ts, id) %s (%s, ?, ?)", col.name, compare, placeholderFor(col))
+			args = append(args, value, c.TS, c.ID)
+		}
 	}
-	sql := fmt.Sprintf(
-		"SELECT %s FROM traffic WHERE %s ORDER BY ts %s, id %s LIMIT %d",
-		ListColumns, where, direction, direction, f.Limit+1)
+
+	sql := fmt.Sprintf("SELECT %s FROM traffic WHERE %s ORDER BY %s LIMIT %d",
+		ListColumns, where, order, f.Limit+1)
 	return sql, args, nil
+}
+
+// placeholderFor wraps the bound sort value so its type matches the column.
+func placeholderFor(col column) string {
+	if col.kind == kIP {
+		return "toIPv6(?)"
+	}
+	return "?"
+}
+
+// castCursorValue converts a value that has been through JSON back into
+// something the column can be compared with.
+func castCursorValue(col column, v any) (any, error) {
+	if v == nil {
+		return nil, fmt.Errorf("query: cursor is missing its sort value")
+	}
+	switch col.kind {
+	case kUInt:
+		switch n := v.(type) {
+		case float64:
+			return uint64(n), nil
+		case string:
+			parsed, err := strconv.ParseUint(n, 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("query: invalid cursor value")
+			}
+			return parsed, nil
+		}
+		return nil, fmt.Errorf("query: invalid cursor value")
+	case kBool:
+		return boolToUint8(v), nil
+	default:
+		s, ok := v.(string)
+		if !ok {
+			return fmt.Sprint(v), nil
+		}
+		return s, nil
+	}
 }
 
 // Count renders an exact count, capped so a wide filter cannot scan everything.
