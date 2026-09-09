@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="580" viewBox="0 0 980 580" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#64748b"/>
+    </marker>
+  </defs>
+
+  <rect width="980" height="580" fill="#ffffff"/>
+
+  <!-- client -->
+  <rect x="20" y="63" width="130" height="64" rx="8" fill="#ffffff" stroke="#d8dde3"/>
+  <text x="85" y="90" text-anchor="middle" font-size="14" font-weight="600" fill="#0f172a">client</text>
+  <text x="85" y="110" text-anchor="middle" font-size="11" fill="#64748b">browser · scanner</text>
+
+  <!-- proxy -->
+  <rect x="220" y="30" width="420" height="165" rx="10" fill="#f7fbfa" stroke="#0f766e"/>
+  <text x="242" y="58" font-size="15" font-weight="600" fill="#0f766e">proxy</text>
+  <text x="618" y="58" text-anchor="end" font-size="11" fill="#64748b">Go · terminates TLS</text>
+
+  <circle cx="248" cy="88" r="3" fill="#0f766e"/>
+  <text x="262" y="92" font-size="13" fill="#0f172a">peek ClientHello → JA3 / JA4 fingerprint</text>
+  <circle cx="248" cy="114" r="3" fill="#0f766e"/>
+  <text x="262" y="118" font-size="13" fill="#0f172a">certificate: uploaded, or minted on demand</text>
+  <circle cx="248" cy="140" r="3" fill="#7c3aed"/>
+  <text x="262" y="144" font-size="13" fill="#0f172a">Coraza + OWASP CRS 4 — detect or enforce</text>
+  <circle cx="248" cy="166" r="3" fill="#0f766e"/>
+  <text x="262" y="170" font-size="13" fill="#0f172a">capture · redact · inject X-Real-IP</text>
+
+  <!-- upstream -->
+  <rect x="790" y="63" width="170" height="64" rx="8" fill="#ffffff" stroke="#d8dde3"/>
+  <text x="875" y="90" text-anchor="middle" font-size="14" font-weight="600" fill="#0f172a">upstream app</text>
+  <text x="875" y="110" text-anchor="middle" font-size="11" fill="#64748b">any reachable host</text>
+
+  <!-- client → proxy → upstream -->
+  <line x1="152" y1="95" x2="212" y2="95" stroke="#64748b" stroke-width="1.4" marker-end="url(#arrow)"/>
+  <text x="182" y="86" text-anchor="middle" font-size="11" fill="#64748b">TLS</text>
+  <line x1="642" y1="95" x2="784" y2="95" stroke="#64748b" stroke-width="1.4" marker-end="url(#arrow)"/>
+  <text x="713" y="86" text-anchor="middle" font-size="11" fill="#64748b">HTTP/1.1 · HTTP/2 · WS</text>
+
+  <!-- spool and live tail -->
+  <rect x="230" y="272" width="190" height="60" rx="8" fill="#ffffff" stroke="#d8dde3"/>
+  <text x="325" y="298" text-anchor="middle" font-size="13" font-weight="600" fill="#0f172a">disk spool (WAL)</text>
+  <text x="325" y="317" text-anchor="middle" font-size="11" fill="#64748b">survives SIGKILL</text>
+
+  <rect x="450" y="272" width="190" height="60" rx="8" fill="#ffffff" stroke="#d8dde3"/>
+  <text x="545" y="298" text-anchor="middle" font-size="13" font-weight="600" fill="#0f172a">live tail</text>
+  <text x="545" y="317" text-anchor="middle" font-size="11" fill="#64748b">in-memory fan-out</text>
+
+  <line x1="325" y1="197" x2="325" y2="266" stroke="#64748b" stroke-width="1.4" marker-end="url(#arrow)"/>
+  <line x1="545" y1="197" x2="545" y2="266" stroke="#64748b" stroke-width="1.4" marker-end="url(#arrow)"/>
+
+  <!-- clickhouse -->
+  <rect x="230" y="372" width="190" height="60" rx="8" fill="#ffffff" stroke="#d8dde3"/>
+  <text x="325" y="398" text-anchor="middle" font-size="13" font-weight="600" fill="#0f172a">ClickHouse</text>
+  <text x="325" y="417" text-anchor="middle" font-size="11" fill="#64748b">batched · partitioned · TTL</text>
+
+  <line x1="325" y1="334" x2="325" y2="366" stroke="#64748b" stroke-width="1.4" marker-end="url(#arrow)"/>
+  <text x="335" y="355" font-size="11" fill="#64748b">batch insert</text>
+
+  <!-- api -->
+  <rect x="220" y="472" width="420" height="70" rx="10" fill="#f7fbfa" stroke="#0f766e"/>
+  <text x="242" y="500" font-size="15" font-weight="600" fill="#0f766e">api</text>
+  <text x="282" y="500" font-size="13" fill="#0f172a">REST + WebSocket</text>
+  <text x="242" y="522" font-size="11" fill="#64748b">keyset pagination · filters · replay · alerts · auth</text>
+
+  <line x1="325" y1="434" x2="325" y2="466" stroke="#64748b" stroke-width="1.4" marker-end="url(#arrow)"/>
+  <path d="M545 334 L545 466" fill="none" stroke="#64748b" stroke-width="1.4" marker-end="url(#arrow)"/>
+
+  <!-- postgres -->
+  <rect x="700" y="472" width="260" height="70" rx="8" fill="#ffffff" stroke="#d8dde3"/>
+  <text x="830" y="500" text-anchor="middle" font-size="13" font-weight="600" fill="#0f172a">Postgres</text>
+  <text x="830" y="519" text-anchor="middle" font-size="11" fill="#64748b">apps · certificates · users · exclusions</text>
+  <line x1="646" y1="507" x2="694" y2="507" stroke="#64748b" stroke-width="1.4" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+
+  <!-- web -->
+  <rect x="20" y="472" width="150" height="70" rx="8" fill="#ffffff" stroke="#d8dde3"/>
+  <text x="95" y="500" text-anchor="middle" font-size="13" font-weight="600" fill="#0f172a">web</text>
+  <text x="95" y="519" text-anchor="middle" font-size="11" fill="#64748b">React UI</text>
+  <line x1="176" y1="507" x2="214" y2="507" stroke="#64748b" stroke-width="1.4" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+
+  <!-- config hot reload -->
+  <path d="M900 466 L900 242 L600 242 L600 201" fill="none" stroke="#cbd5e1" stroke-width="1.2" stroke-dasharray="4 4" marker-end="url(#arrow)"/>
+  <text x="890" y="234" text-anchor="end" font-size="11" fill="#94a3b8">policy, hot-reloaded</text>
+</svg>

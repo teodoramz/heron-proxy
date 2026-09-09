@@ -10,26 +10,7 @@ done before deciding whether to enforce it.
 > A heron stands in the current, watches everything pass, and strikes only when
 > it has decided.
 
-```
-                    ┌──────────────────────────────────────┐
-  client ──TLS──▶   │ proxy                                │  ──▶ upstream app
-                    │  peek ClientHello → JA3/JA4          │      (any host)
-                    │  certificate: uploaded, or minted    │
-                    │  Coraza + CRS · detect or enforce    │
-                    │  capture · redact · inject X-Real-IP │
-                    └──────┬────────────────────┬──────────┘
-                           │                    │
-                    disk spool (WAL)      live-tail fan-out
-                           │                    │
-                  ClickHouse (batched)          │
-                           │                    │
-                    ┌──────┴────────────────────┴──────────┐
-                    │ api — REST + WebSocket               │
-                    │  Postgres: apps, certs, users, rules │
-                    └──────────────────┬───────────────────┘
-                                       │
-                                  web (React)
-```
+![Architecture](docs/architecture.svg)
 
 ## What it does
 
