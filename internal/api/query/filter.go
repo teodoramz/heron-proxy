@@ -7,6 +7,7 @@ package query
 import (
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -97,7 +98,7 @@ var columns = map[string]column{
 // allowedOps lists the operators each kind accepts.
 var allowedOps = map[kind]map[Op]bool{
 	kString:    {OpEq: true, OpNe: true, OpContains: true, OpPrefix: true, OpSuffix: true, OpRegex: true, OpIn: true, OpExists: true},
-	kLowCard:   {OpEq: true, OpNe: true, OpIn: true, OpContains: true, OpPrefix: true, OpExists: true},
+	kLowCard:   {OpEq: true, OpNe: true, OpIn: true, OpContains: true, OpPrefix: true, OpRegex: true, OpExists: true},
 	kUInt:      {OpEq: true, OpNe: true, OpLt: true, OpLte: true, OpGt: true, OpGte: true, OpIn: true},
 	kIP:        {OpEq: true, OpNe: true, OpCIDR: true, OpIn: true},
 	kBool:      {OpEq: true},
@@ -219,6 +220,12 @@ func (c Condition) validate() error {
 		}
 		if len(s) > maxRegexLen {
 			return fmt.Errorf("query: regex longer than %d characters", maxRegexLen)
+		}
+		// Go's regexp and ClickHouse's match() are both RE2, so compiling here
+		// rejects a bad pattern with a precise message instead of letting the
+		// database fail the whole query.
+		if _, err := regexp.Compile(s); err != nil {
+			return fmt.Errorf("query: invalid regular expression: %w", err)
 		}
 	}
 	return nil

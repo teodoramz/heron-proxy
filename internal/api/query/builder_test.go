@@ -354,3 +354,33 @@ func TestFieldsListed(t *testing.T) {
 		t.Errorf("only %d filterable fields", len(Fields()))
 	}
 }
+
+func TestRegexIsValidatedBeforeReachingTheDatabase(t *testing.T) {
+	// A pattern the database would reject must be caught here, with a message
+	// naming the problem rather than a query failure.
+	_, _, err := Where(baseFilter(Condition{Field: "path", Op: OpRegex, Value: "(unclosed"}))
+	if err == nil {
+		t.Fatal("an invalid regular expression was accepted")
+	}
+	if !strings.Contains(err.Error(), "invalid regular expression") {
+		t.Errorf("err = %v", err)
+	}
+}
+
+func TestValidRegexAccepted(t *testing.T) {
+	for _, pattern := range []string{`^/api/v\d+/`, `\.(php|asp)$`, `(?i)admin`, `[a-z]{3,8}`} {
+		if _, _, err := Where(baseFilter(Condition{Field: "path", Op: OpRegex, Value: pattern})); err != nil {
+			t.Errorf("pattern %q rejected: %v", pattern, err)
+		}
+	}
+}
+
+func TestRegexAllowedOnEnumeratedColumns(t *testing.T) {
+	// Method and app are short enumerated columns, but matching them by pattern
+	// is still a reasonable thing to want.
+	for _, field := range []string{"method", "app_id", "country", "resp_content_type"} {
+		if _, _, err := Where(baseFilter(Condition{Field: field, Op: OpRegex, Value: "^A"})); err != nil {
+			t.Errorf("regex on %q rejected: %v", field, err)
+		}
+	}
+}

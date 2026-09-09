@@ -4,6 +4,9 @@ import { ColumnPicker } from './ColumnPicker'
 import type { WidthMode } from './columns'
 import {
   COMMON_FIELDS,
+  EXAMPLES,
+  FIELD_HELP,
+  OP_HELP,
   OP_LABELS,
   PRESETS,
   activePreset,
@@ -61,7 +64,8 @@ export function FilterBar({
 }: Props) {
   const [schema, setSchema] = useState<FieldSchema[]>([])
   const [attackTypes, setAttackTypes] = useState<string[]>([])
-  const [advanced, setAdvanced] = useState(false)
+  const [advanced, setAdvanced] = useState(() => localStorage.getItem('pw-builder') !== 'closed')
+  const [help, setHelp] = useState(false)
   const [search, setSearch] = useState('')
 
   const [field, setField] = useState('path')
@@ -246,8 +250,27 @@ export function FilterBar({
           </button>
         ))}
         <span className="spacer" />
-        <button type="button" className="btn btn-sm" onClick={() => setAdvanced((v) => !v)}>
-          {advanced ? 'Hide conditions' : 'Add a condition'}
+        <button
+          type="button"
+          className="btn btn-sm"
+          aria-pressed={advanced}
+          onClick={() => {
+            setAdvanced((v) => {
+              localStorage.setItem('pw-builder', v ? 'closed' : 'open')
+              return !v
+            })
+          }}
+        >
+          {advanced ? 'Hide builder' : 'Build a filter'}
+        </button>
+        <button
+          type="button"
+          className="btn btn-sm"
+          aria-pressed={help}
+          onClick={() => setHelp((v) => !v)}
+          title="What the fields and comparisons mean"
+        >
+          Help
         </button>
       </div>
 
@@ -311,6 +334,7 @@ export function FilterBar({
             <ValueInput
               kind={current?.kind}
               field={field}
+              op={op}
               value={value}
               onChange={setValue}
               attackTypes={attackTypes}
@@ -323,6 +347,37 @@ export function FilterBar({
           {problem && <span className="error-msg" style={{ margin: 0 }}>{problem}</span>}
         </form>
       )}
+
+      {advanced && !problem && (
+        <p className="filter-hint">
+          <strong>{fieldLabel(field)}</strong> — {FIELD_HELP[field]?.what ?? 'One of the recorded fields.'}{' '}
+          <span className="muted">{OP_HELP[op]}</span>
+          {op === 'regex' ? (
+            <>
+              {' '}
+              <button type="button" className="linkish" onClick={() => setValue('^/api/v\\d+/')}>
+                Try ^/api/v\d+/
+              </button>
+            </>
+          ) : (
+            FIELD_HELP[field]?.example && (
+              <>
+                {' '}
+                <button
+                  type="button"
+                  className="linkish"
+                  onClick={() => setValue(FIELD_HELP[field].example)}
+                  title="Fill this in"
+                >
+                  Try {FIELD_HELP[field].example}
+                </button>
+              </>
+            )
+          )}
+        </p>
+      )}
+
+      {help && <HelpPanel onClose={() => setHelp(false)} />}
 
       {(activeCount > 0 || lastLoaded) && (
         <div className="filter-row">
@@ -366,16 +421,69 @@ export function FilterBar({
   )
 }
 
+/** HelpPanel explains the vocabulary, and answers the questions people arrive with. */
+function HelpPanel({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="help-panel">
+      <div className="help-head">
+        <strong>Building a filter</strong>
+        <button className="btn btn-sm" onClick={onClose}>
+          Close
+        </button>
+      </div>
+
+      <div className="help-body">
+        <p className="hint" style={{ marginTop: 0 }}>
+          A filter is one or more conditions, all of which must hold. Pick what to look at, how to
+          compare it, and the value. The buttons above are shortcuts for the common ones.
+        </p>
+
+        <h4>Questions people ask</h4>
+        <table className="data">
+          <tbody>
+            {EXAMPLES.map((e) => (
+              <tr key={e.question}>
+                <td style={{ width: '38%' }}>{e.question}</td>
+                <td className="muted">{e.how}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        <h4>What the comparisons do</h4>
+        <table className="data">
+          <tbody>
+            {(Object.keys(OP_LABELS) as (keyof typeof OP_LABELS)[]).map((op) => (
+              <tr key={op}>
+                <td style={{ width: 150 }}>{OP_LABELS[op]}</td>
+                <td className="muted">{OP_HELP[op]}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        <p className="hint">
+          Scores and rules: a request accumulates an <strong>anomaly score</strong> as rules match.
+          Passing the application’s threshold marks it <strong>suspicious</strong> — that is a
+          prompt to look, not a verdict. Rule numbers can be looked up on the Rules page.
+        </p>
+      </div>
+    </div>
+  )
+}
+
 /** ValueInput matches the control to the kind of value the field holds. */
 function ValueInput({
   kind,
   field,
+  op,
   value,
   onChange,
   attackTypes,
 }: {
   kind?: string
   field: string
+  op: Op
   value: string
   onChange: (v: string) => void
   attackTypes: string[]
@@ -423,6 +531,19 @@ function ValueInput({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         aria-label="Value"
+      />
+    )
+  }
+  if (op === 'regex') {
+    return (
+      <input
+        className="input mono"
+        style={{ width: 260 }}
+        placeholder="^/api/v\\d+/"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        aria-label="Regular expression"
+        spellCheck={false}
       />
     )
   }

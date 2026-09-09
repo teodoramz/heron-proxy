@@ -31,3 +31,11 @@ describe('humanize', () => {
     expect(humanize('something nobody predicted')).toBe('something nobody predicted')
   })
 })
+
+describe('humanize, regex', () => {
+  it('explains an invalid pattern and keeps the detail', () => {
+    const out = humanize('query: invalid regular expression: error parsing regexp: missing closing ): `(unclosed`')
+    expect(out).toContain('not valid')
+    expect(out).toContain('missing closing')
+  })
+})

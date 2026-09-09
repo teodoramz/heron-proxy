@@ -27,6 +27,10 @@ export function humanize(message: string): string {
   if (m.includes('requires a key')) {
     return 'Name the header you want to match, for example content-type.'
   }
+  if (m.includes('invalid regular expression')) {
+    const detail = message.split('invalid regular expression:').pop()?.trim()
+    return `That pattern is not valid${detail ? `: ${detail}` : ''}. Check the brackets are balanced.`
+  }
   if (m.includes('regex longer than')) {
     return 'That pattern is too long. Keep it under 256 characters.'
   }
