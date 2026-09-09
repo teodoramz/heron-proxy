@@ -91,7 +91,7 @@ function Overview({ detail }: { detail: EventDetail }) {
       <dt>Anomaly score</dt>
       <dd>
         {detail.anomaly_score}
-        {detail.would_block && <span className="block-flag"> · would block</span>}
+        {detail.would_block && <span className="block-flag"> · suspicious</span>}
       </dd>
       <dt>Total time</dt>
       <dd>{duration(detail.duration_ms)}</dd>
@@ -199,14 +199,28 @@ function WafTab({ detail }: { detail: EventDetail }) {
         <dd>{detail.rule_severity}</dd>
         <dt>Paranoia level</dt>
         <dd>{detail.paranoia_max}</dd>
-        <dt>Verdict</dt>
+        <dt>Assessment</dt>
         <dd className={detail.would_block ? 'block-flag' : ''}>
-          {detail.would_block ? 'Would have been blocked' : 'Allowed'}
+          {detail.would_block
+            ? 'Suspicious — the score passed this app’s threshold'
+            : 'Below the threshold'}
         </dd>
       </dl>
 
+      <p className="hint" style={{ marginTop: 0 }}>
+        Nothing was blocked; the request reached the application either way. A rule matching is
+        evidence to read, not a conclusion — check what actually matched below before treating it as
+        an attack.
+      </p>
+
+      <p className="hint" style={{ marginTop: 0 }}>
+        Recording a verdict does not change detection or block anything. It labels this match so the
+        tuning page can rank which rules are worth excluding, and so whoever looks next can see what
+        you concluded.
+      </p>
+
       <div className="field">
-        <label htmlFor="verdict-note">Note for the tuning queue</label>
+        <label htmlFor="verdict-note">Note (optional)</label>
         <input
           id="verdict-note"
           className="input"
@@ -222,10 +236,18 @@ function WafTab({ detail }: { detail: EventDetail }) {
           <h4>{r.rule_id}</h4>
           <p>{r.message || 'No message recorded.'}</p>
           <div className="row">
-            <button className="btn btn-sm" onClick={() => mark(r.rule_id, 'false_positive')}>
-              False positive
+            <button
+              className="btn btn-sm"
+              onClick={() => mark(r.rule_id, 'false_positive')}
+              title="This matched our own application, not an attack"
+            >
+              Our own traffic
             </button>
-            <button className="btn btn-sm" onClick={() => mark(r.rule_id, 'true_positive')}>
+            <button
+              className="btn btn-sm"
+              onClick={() => mark(r.rule_id, 'true_positive')}
+              title="This really was an attack"
+            >
               Real attack
             </button>
           </div>

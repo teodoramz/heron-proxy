@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api/client'
+import { ColumnPicker } from './ColumnPicker'
 import type { Condition, FieldSchema, Filter, Op } from '../api/types'
 
 interface Props {
@@ -9,6 +10,13 @@ interface Props {
   liveConnected: boolean
   onToggleLive: () => void
   total?: { count: number; capped: boolean }
+  columns: string[]
+  onColumnsChange: (ids: string[]) => void
+  autoRefresh: boolean
+  onToggleAutoRefresh: () => void
+  onRefresh: () => void
+  loading: boolean
+  lastLoaded?: Date
 }
 
 const RANGES: { label: string; minutes: number }[] = [
@@ -20,7 +28,21 @@ const RANGES: { label: string; minutes: number }[] = [
 ]
 
 /** FilterBar edits the query. Conditions are chips so the whole filter is legible at a glance. */
-export function FilterBar({ filter, onChange, live, liveConnected, onToggleLive, total }: Props) {
+export function FilterBar({
+  filter,
+  onChange,
+  live,
+  liveConnected,
+  onToggleLive,
+  total,
+  columns,
+  onColumnsChange,
+  autoRefresh,
+  onToggleAutoRefresh,
+  onRefresh,
+  loading,
+  lastLoaded,
+}: Props) {
   const [schema, setSchema] = useState<FieldSchema[]>([])
   const [field, setField] = useState('path')
   const [op, setOp] = useState<Op>('contains')
@@ -137,15 +159,39 @@ export function FilterBar({ filter, onChange, live, liveConnected, onToggleLive,
         <button
           type="button"
           className="btn btn-sm"
+          onClick={onRefresh}
+          disabled={loading}
+          title="Reload the table now"
+        >
+          {loading ? 'Loading…' : 'Refresh'}
+        </button>
+
+        <button
+          type="button"
+          className="btn btn-sm"
+          onClick={onToggleAutoRefresh}
+          aria-pressed={autoRefresh}
+          disabled={live}
+          title={live ? 'Live tail is already streaming' : 'Reload every 2 seconds'}
+        >
+          Auto {autoRefresh && !live ? 'on' : 'off'}
+        </button>
+
+        <button
+          type="button"
+          className="btn btn-sm"
           onClick={onToggleLive}
           aria-pressed={live}
           title={live ? 'Stop streaming new requests' : 'Stream new requests as they arrive'}
         >
-          <span className={`live-dot ${live && liveConnected ? 'on' : ''}`} /> Live
+          <span className={`live-dot ${live ? (liveConnected ? 'on' : 'pending') : ''}`} />{' '}
+          {live ? (liveConnected ? 'Live' : 'Connecting') : 'Live'}
         </button>
+
+        <ColumnPicker selected={columns} onChange={onColumnsChange} />
       </form>
 
-      {(conditions.length > 0 || total) && (
+      {(conditions.length > 0 || total || lastLoaded) && (
         <div className="filter-row">
           {conditions.map((c, i) => (
             <span className="chip" key={`${c.field}-${i}`}>
@@ -161,6 +207,11 @@ export function FilterBar({ filter, onChange, live, liveConnected, onToggleLive,
           {total && (
             <span className="muted mono">
               {total.capped ? `${total.count.toLocaleString()}+` : total.count.toLocaleString()} requests
+            </span>
+          )}
+          {lastLoaded && (
+            <span className="muted mono" title="When the table last reloaded">
+              updated {lastLoaded.toLocaleTimeString('en-GB', { hour12: false })}
             </span>
           )}
         </div>

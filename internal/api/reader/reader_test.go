@@ -78,6 +78,15 @@ func newReader(t *testing.T) *Reader {
 	return testReader
 }
 
+// msgsFor pairs one message with each rule, as the proxy records them.
+func msgsFor(rules []uint32) []string {
+	out := make([]string, 0, len(rules))
+	for _, id := range rules {
+		out = append(out, fmt.Sprintf("rule %d matched", id))
+	}
+	return out
+}
+
 // fixtures builds a small, deterministic traffic set.
 func fixtures() []event.Event {
 	mk := func(i int, app, method, path string, status uint16, anomaly uint16, ip string, rules []uint32, tags []string, block bool) event.Event {
@@ -114,7 +123,7 @@ func fixtures() []event.Event {
 			WAFMS:           1,
 			AnomalyScore:    anomaly,
 			RuleIDs:         rules,
-			RuleMsgs:        []string{"detected"},
+			RuleMsgs:        msgsFor(rules),
 			RuleTags:        tags,
 			RuleSeverity:    5,
 			ParanoiaMax:     1,
@@ -574,5 +583,26 @@ func TestEmptyRangeReturnsNothing(t *testing.T) {
 	}
 	if page.NextCursor != "" {
 		t.Error("cursor returned for an empty page")
+	}
+}
+
+// TestTopRulesPairsMessageWithItsRule guards against attributing an arbitrary
+// message from an event to every rule that event matched.
+func TestTopRulesPairsMessageWithItsRule(t *testing.T) {
+	r := newReader(t)
+	rules, err := r.TopRules(context.Background(), fullRange(), 10)
+	if err != nil {
+		t.Fatalf("TopRules: %v", err)
+	}
+	if len(rules) == 0 {
+		t.Fatal("no rules returned")
+	}
+	// The fixture names each message after its own rule, so a mispaired message
+	// is detectable directly.
+	for _, rule := range rules {
+		want := fmt.Sprintf("rule %d matched", rule.RuleID)
+		if rule.Message != want {
+			t.Errorf("rule %d reports %q, want %q", rule.RuleID, rule.Message, want)
+		}
 	}
 }

@@ -69,7 +69,7 @@ export function TrafficChart({ points, height = 150 }: { points: SeriesPoint[]; 
         ))}
         <span className="row" style={{ gap: 5 }}>
           <span style={{ width: 9, height: 9, background: 'var(--block)', borderRadius: 2 }} />
-          <span className="muted">would block</span>
+          <span className="muted">suspicious</span>
         </span>
       </div>
     </div>

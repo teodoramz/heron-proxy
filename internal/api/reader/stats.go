@@ -105,12 +105,14 @@ func (r *Reader) TimeSeries(ctx context.Context, f query.Filter, bucket time.Dur
 }
 
 // RuleStat counts hits for one CRS rule.
+//
+// There is no per-rule tag list: an event stores the union of tags across every
+// rule that matched, so tags cannot be attributed back to a single rule.
 type RuleStat struct {
-	RuleID  uint32   `json:"rule_id"`
-	Hits    uint64   `json:"hits"`
-	Clients uint64   `json:"clients"`
-	Tags    []string `json:"tags,omitempty"`
-	Message string   `json:"message,omitempty"`
+	RuleID  uint32 `json:"rule_id"`
+	Hits    uint64 `json:"hits"`
+	Clients uint64 `json:"clients"`
+	Message string `json:"message,omitempty"`
 }
 
 // TopRules ranks the rules that fired most, with a sample message for each.
@@ -119,9 +121,14 @@ func (r *Reader) TopRules(ctx context.Context, f query.Filter, limit int) ([]Rul
 	if err != nil {
 		return nil, err
 	}
-	sql := fmt.Sprintf(`SELECT rule_id, count() AS hits, uniq(client_ip) AS clients,
-			any(rule_tags), any(rule_msgs)
-		FROM traffic ARRAY JOIN rule_ids AS rule_id
+	// Both arrays are joined together so each message stays paired with the rule
+	// that produced it; joining rule_ids alone would attribute an arbitrary
+	// message from the row to every rule in it. arrayResize keeps the two the
+	// same length, because ARRAY JOIN fails the whole query on a mismatch and
+	// rows written by earlier versions may be uneven.
+	sql := fmt.Sprintf(`SELECT rule_id, count() AS hits, uniq(client_ip) AS clients, any(rule_msg)
+		FROM traffic
+		ARRAY JOIN rule_ids AS rule_id, arrayResize(rule_msgs, length(rule_ids), '') AS rule_msg
 		WHERE %s GROUP BY rule_id ORDER BY hits DESC LIMIT %d`, where, clampLimit(limit))
 
 	rows, err := r.conn.Query(ctx, sql, args...)
@@ -133,12 +140,8 @@ func (r *Reader) TopRules(ctx context.Context, f query.Filter, limit int) ([]Rul
 	var out []RuleStat
 	for rows.Next() {
 		var s RuleStat
-		var msgs []string
-		if err := rows.Scan(&s.RuleID, &s.Hits, &s.Clients, &s.Tags, &msgs); err != nil {
+		if err := rows.Scan(&s.RuleID, &s.Hits, &s.Clients, &s.Message); err != nil {
 			return nil, fmt.Errorf("reader: scan rule stat: %w", err)
-		}
-		if len(msgs) > 0 {
-			s.Message = msgs[0]
 		}
 		out = append(out, s)
 	}

@@ -73,7 +73,7 @@ export function Dashboard() {
           <Stat label="Requests" value={summary ? count(summary.requests) : '—'} />
           <Stat label="Sources" value={summary ? count(summary.clients) : '—'} />
           <Stat
-            label="Would block"
+            label="Suspicious"
             value={summary ? count(summary.would_block) : '—'}
             tone={summary && summary.would_block > 0 ? 'block' : undefined}
           />
