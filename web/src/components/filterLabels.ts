@@ -135,6 +135,25 @@ export const PRESETS: Preset[] = [
   },
 ]
 
+/**
+ * activePreset reports which preset the current conditions are, if any.
+ *
+ * A preset replaces the filter rather than adding to it, so at most one can be
+ * in effect. Knowing which lets the button show as pressed and toggle off.
+ */
+export function activePreset(conditions: { field: string; op: Op; value?: unknown }[]): string | null {
+  for (const preset of PRESETS) {
+    if (preset.conditions.length !== conditions.length) continue
+    const same = preset.conditions.every((want) =>
+      conditions.some(
+        (have) => have.field === want.field && have.op === want.op && have.value === want.value,
+      ),
+    )
+    if (same) return preset.id
+  }
+  return null
+}
+
 /** searchConditions turns a plain search box into an OR across the text fields. */
 export function searchConditions(text: string) {
   return [

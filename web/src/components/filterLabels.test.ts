@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { PRESETS, describe as describeCondition, fieldLabel, searchConditions } from './filterLabels'
+import {
+  PRESETS,
+  activePreset,
+  describe as describeCondition,
+  fieldLabel,
+  searchConditions,
+} from './filterLabels'
 
 describe('fieldLabel', () => {
   it('gives a plain name for a column', () => {
@@ -57,5 +63,30 @@ describe('searchConditions', () => {
       expect(c.op).toBe('contains')
       expect(c.value).toBe('admin')
     }
+  })
+})
+
+describe('activePreset', () => {
+  it('recognises the conditions a preset installed', () => {
+    const suspicious = PRESETS.find((p) => p.id === 'suspicious')!
+    expect(activePreset(suspicious.conditions)).toBe('suspicious')
+  })
+
+  it('recognises every preset by its own conditions', () => {
+    for (const p of PRESETS) {
+      expect(activePreset(p.conditions)).toBe(p.id)
+    }
+  })
+
+  it('reports nothing for a filter built by hand', () => {
+    expect(activePreset([{ field: 'path', op: 'contains', value: '/admin' }])).toBeNull()
+    expect(activePreset([])).toBeNull()
+  })
+
+  it('does not match a preset that is only part of the filter', () => {
+    const suspicious = PRESETS.find((p) => p.id === 'suspicious')!
+    expect(
+      activePreset([...suspicious.conditions, { field: 'status', op: 'gte', value: 500 }]),
+    ).toBeNull()
   })
 })

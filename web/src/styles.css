@@ -170,6 +170,13 @@ a:hover { text-decoration: underline; }
 
 .btn:hover { border-color: var(--accent-dim); }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* A pressed button is a filter that is currently in effect. */
+.btn[aria-pressed='true'] {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface-2));
+}
 .btn-primary { background: var(--accent); border-color: var(--accent); color: #0f1115; }
 .btn-primary:hover { filter: brightness(1.08); }
 .btn-danger:hover { border-color: var(--s5xx); color: var(--s5xx); }

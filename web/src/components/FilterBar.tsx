@@ -6,6 +6,7 @@ import {
   COMMON_FIELDS,
   OP_LABELS,
   PRESETS,
+  activePreset,
   describe,
   fieldLabel,
   searchConditions,
@@ -115,13 +116,18 @@ export function FilterBar({
     apply({ groups: [...others, { op: 'or', conditions: searchConditions(text) }] })
   }
 
-  function addPreset(id: string) {
+  // A preset replaces the filter rather than adding to it, so clicking two in
+  // a row shows the second rather than the impossible intersection of both.
+  // Clicking the one already in effect clears it.
+  function choosePreset(id: string) {
     const preset = PRESETS.find((p) => p.id === id)
     if (!preset) return
-    const additions = preset.conditions.filter(
-      (c) => !conditions.some((existing) => existing.field === c.field && existing.op === c.op),
-    )
-    apply({ conditions: [...conditions, ...additions] })
+    if (active === id) {
+      apply({ conditions: [], groups: [] })
+      return
+    }
+    setSearch('')
+    apply({ conditions: preset.conditions as Condition[], groups: [] })
   }
 
   function addCondition(e: React.FormEvent) {
@@ -159,6 +165,7 @@ export function FilterBar({
 
   const searchGroup = groups.find((g) => g.op === 'or')
   const activeCount = conditions.length + (searchGroup ? 1 : 0)
+  const active = activePreset(conditions)
 
   return (
     <div className="filters">
@@ -231,8 +238,9 @@ export function FilterBar({
             key={p.id}
             type="button"
             className="btn btn-sm"
-            title={p.title}
-            onClick={() => addPreset(p.id)}
+            aria-pressed={active === p.id}
+            title={active === p.id ? `${p.title} — click again to clear` : p.title}
+            onClick={() => choosePreset(p.id)}
           >
             {p.label}
           </button>
