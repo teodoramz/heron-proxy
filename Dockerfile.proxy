@@ -1,0 +1,15 @@
+FROM golang:1.26-alpine AS build
+WORKDIR /src
+RUN apk add --no-cache git
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/proxy ./cmd/proxy
+
+FROM alpine:3.21
+RUN apk add --no-cache ca-certificates tzdata && adduser -D -u 10001 proxy
+COPY --from=build /out/proxy /usr/local/bin/proxy
+RUN mkdir -p /data/spool /data/blobs /rules && chown -R proxy:proxy /data /rules
+USER proxy
+EXPOSE 80 443 9090
+ENTRYPOINT ["/usr/local/bin/proxy"]

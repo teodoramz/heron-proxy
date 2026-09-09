@@ -1,0 +1,105 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: proxy-waf
+spec:
+  replicas: 1
+  strategy: { type: Recreate }
+  selector:
+    matchLabels: { app: postgres }
+  template:
+    metadata:
+      labels: { app: postgres }
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          env:
+            - name: POSTGRES_USER
+              value: proxywaf
+            - name: POSTGRES_DB
+              value: proxywaf
+            - name: POSTGRES_PASSWORD
+              valueFrom: { secretKeyRef: { name: proxy-waf, key: POSTGRES_PASSWORD } }
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          ports:
+            - containerPort: 5432
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "proxywaf", "-d", "proxywaf"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      volumes:
+        - name: data
+          persistentVolumeClaim: { claimName: pgdata }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: proxy-waf
+spec:
+  selector: { app: postgres }
+  ports:
+    - port: 5432
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: clickhouse
+  namespace: proxy-waf
+spec:
+  replicas: 1
+  strategy: { type: Recreate }
+  selector:
+    matchLabels: { app: clickhouse }
+  template:
+    metadata:
+      labels: { app: clickhouse }
+    spec:
+      containers:
+        - name: clickhouse
+          image: clickhouse/clickhouse-server:24.8-alpine
+          env:
+            - name: CLICKHOUSE_DB
+              value: proxywaf
+            - name: CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT
+              value: "1"
+            - name: CLICKHOUSE_PASSWORD
+              valueFrom: { secretKeyRef: { name: proxy-waf, key: CLICKHOUSE_PASSWORD } }
+          ports:
+            - containerPort: 9000
+            - containerPort: 8123
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/clickhouse
+          readinessProbe:
+            tcpSocket: { port: 9000 }
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          resources:
+            requests: { memory: 2Gi, cpu: "1" }
+      volumes:
+        - name: data
+          persistentVolumeClaim: { claimName: chdata }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: clickhouse
+  namespace: proxy-waf
+spec:
+  selector: { app: clickhouse }
+  ports:
+    - name: native
+      port: 9000
+      targetPort: 9000
+    - name: http
+      port: 8123
+      targetPort: 8123

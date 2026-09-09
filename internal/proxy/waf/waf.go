@@ -244,6 +244,19 @@ func (t *Tx) Result() Result {
 	for _, m := range t.tx.MatchedRules() {
 		meta := m.Rule()
 		id := uint32(meta.ID())
+
+		// The anomaly-evaluation rules report the verdict rather than a finding.
+		if id == ruleInboundBlock || id == ruleOutboundBlock {
+			res.WouldBlock = true
+			if n, ok := parseTotalScore(m.Message()); ok {
+				exact, haveExact = n, true
+			}
+			continue
+		}
+		if !isRecordable(m) {
+			continue
+		}
+
 		sev := severityRank(meta.Severity())
 		pl := paranoiaFromTags(meta.Tags())
 
@@ -257,9 +270,7 @@ func (t *Tx) Result() Result {
 			Phase:    uint8(meta.Phase()),
 		})
 		res.RuleIDs = append(res.RuleIDs, id)
-		if msg := m.Message(); msg != "" {
-			res.Messages = append(res.Messages, msg)
-		}
+		res.Messages = append(res.Messages, m.Message())
 		for _, tag := range meta.Tags() {
 			tagSet[tag] = struct{}{}
 		}
@@ -268,13 +279,6 @@ func (t *Tx) Result() Result {
 		}
 		if pl > res.ParanoiaMax {
 			res.ParanoiaMax = pl
-		}
-		if id == ruleInboundBlock || id == ruleOutboundBlock {
-			res.WouldBlock = true
-			if n, ok := parseTotalScore(m.Message()); ok {
-				exact, haveExact = n, true
-			}
-			continue
 		}
 		score += anomalyWeight(meta)
 	}
@@ -305,7 +309,7 @@ func severityRank(s types.RuleSeverity) uint8 {
 
 // anomalyWeight reproduces the CRS severity-to-score mapping.
 func anomalyWeight(meta types.RuleMetadata) int {
-	if !isDetectionRule(meta) {
+	if isControlRule(meta) {
 		return 0
 	}
 	switch meta.Severity() {
@@ -322,28 +326,33 @@ func anomalyWeight(meta types.RuleMetadata) int {
 	}
 }
 
-// isDetectionRule excludes CRS scoring, correlation and setup rules, which
-// carry a severity but contribute no anomaly points of their own.
-func isDetectionRule(meta types.RuleMetadata) bool {
+// isRecordable keeps only rules worth showing to an analyst.
+//
+// CRS is largely control flow: SecAction blocks that seed variables, and
+// per-paranoia-level markers that skip ahead. They match on every request. Most
+// are declared nolog and carry no message; the rest are excluded by range.
+func isRecordable(m types.MatchedRule) bool {
+	return m.Message() != "" && !isControlRule(m.Rule())
+}
+
+// isControlRule reports whether a rule is CRS scaffolding rather than a finding:
+// initialization and setup (900000-901999), anomaly evaluation (949xxx, 959xxx)
+// and correlation logging (980xxx).
+func isControlRule(meta types.RuleMetadata) bool {
 	id := meta.ID()
-	if id >= 900000 && id < 901000 {
-		return false
-	}
-	if id >= 949000 && id < 950000 {
-		return false
-	}
-	if id >= 959000 && id < 960000 {
-		return false
-	}
-	if id >= 980000 && id < 981000 {
-		return false
+	switch {
+	case id >= 900000 && id < 902000,
+		id >= 949000 && id < 950000,
+		id >= 959000 && id < 960000,
+		id >= 980000 && id < 981000:
+		return true
 	}
 	for _, tag := range meta.Tags() {
 		if tag == "anomaly-evaluation" {
-			return false
+			return true
 		}
 	}
-	return true
+	return false
 }
 
 func paranoiaFromTags(tags []string) uint8 {

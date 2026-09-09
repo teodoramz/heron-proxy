@@ -1,0 +1,25 @@
+# Exposes the UI only. Proxied application traffic reaches the proxy Service
+# directly, since the proxy terminates TLS itself.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: proxy-waf-ui
+  namespace: proxy-waf
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: waf.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web
+                port:
+                  number: 8081
+  tls:
+    - hosts: [waf.example.com]
+      secretName: proxy-waf-ui-tls
