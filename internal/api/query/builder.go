@@ -2,6 +2,7 @@ package query
 
 import (
 	"fmt"
+	"net/netip"
 	"strings"
 )
 
@@ -198,9 +199,33 @@ func renderIP(name string, c Condition) (string, []any, error) {
 	case OpIn:
 		return fmt.Sprintf("%s IN (SELECT toIPv6(arrayJoin(?)))", name), []any{c.Value}, nil
 	case OpCIDR:
-		return fmt.Sprintf("isIPAddressInRange(IPv6NumToString(%s), ?)", name), []any{c.Value}, nil
+		prefix, err := normalizeCIDR(toStringValue(c.Value))
+		if err != nil {
+			return "", nil, err
+		}
+		return fmt.Sprintf("isIPAddressInRange(IPv6NumToString(%s), ?)", name), []any{prefix}, nil
 	}
 	return "", nil, fmt.Errorf("query: unhandled ip operator %q", c.Op)
+}
+
+// normalizeCIDR renders a prefix in the IPv6 form the stored column uses, so an
+// IPv4 prefix still matches addresses held as IPv4-mapped IPv6.
+func normalizeCIDR(value string) (string, error) {
+	prefix, err := netip.ParsePrefix(value)
+	if err != nil {
+		return "", fmt.Errorf("query: invalid CIDR %q: %w", value, err)
+	}
+	if prefix.Addr().Is4() {
+		return netip.PrefixFrom(netip.AddrFrom16(prefix.Addr().As16()), prefix.Bits()+96).String(), nil
+	}
+	return prefix.String(), nil
+}
+
+func toStringValue(v any) string {
+	if s, ok := v.(string); ok {
+		return s
+	}
+	return fmt.Sprint(v)
 }
 
 func boolToUint8(v any) uint8 {
