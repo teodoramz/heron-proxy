@@ -195,7 +195,7 @@ func renderHAR(e event.Event, body string) map[string]any {
 	return map[string]any{
 		"log": map[string]any{
 			"version": "1.2",
-			"creator": map[string]string{"name": "proxy-waf", "version": "1"},
+			"creator": map[string]string{"name": "heron", "version": "1"},
 			"entries": []map[string]any{{
 				"startedDateTime": e.TS.Format("2006-01-02T15:04:05.000Z07:00"),
 				"time":            e.DurationMS,

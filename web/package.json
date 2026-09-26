@@ -1,5 +1,5 @@
 {
-  "name": "proxy-waf-web",
+  "name": "heron-web",
   "private": true,
   "version": "1.0.0",
   "type": "module",

@@ -150,7 +150,7 @@ func (h *Handler) ListCertificates(w http.ResponseWriter, r *http.Request) {
 // CertificateAuthority returns the authority that signs for hosts with no
 // uploaded certificate, so it can be installed as trusted.
 func (h *Handler) CertificateAuthority(w http.ResponseWriter, r *http.Request) {
-	if _, err := h.Store.EnsureCA(r.Context(), "proxy-waf"); err != nil {
+	if _, err := h.Store.EnsureCA(r.Context(), "heron"); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -172,7 +172,7 @@ func (h *Handler) CertificateAuthority(w http.ResponseWriter, r *http.Request) {
 // DownloadCertificateAuthority serves the authority certificate as a file, for
 // installing in a browser or system trust store.
 func (h *Handler) DownloadCertificateAuthority(w http.ResponseWriter, r *http.Request) {
-	if _, err := h.Store.EnsureCA(r.Context(), "proxy-waf"); err != nil {
+	if _, err := h.Store.EnsureCA(r.Context(), "heron"); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
