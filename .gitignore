@@ -1,10 +1,11 @@
 node_modules/
 dist/
 *.log
-data/
-blobs/
-spool/
+/data/
+/blobs/
+/spool/
 .env
 *.key
 *.pem
 deploy/compose/.env
+__pycache__/
