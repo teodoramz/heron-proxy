@@ -78,8 +78,16 @@ func (l *Loader) Load(ctx context.Context) error {
 		}
 	}
 
+	var plain []string
+	for _, a := range apps {
+		if a.HTTPOnly {
+			plain = append(plain, a.Hostnames...)
+		}
+	}
+
 	l.router.Replace(apps)
 	l.certs.Replace(certs)
+	l.certs.SetPlainHosts(plain)
 	l.waf.Reload()
 	l.version.Store(version)
 	l.loaded.Store(true)

@@ -54,21 +54,26 @@ func ValidMode(mode string) bool {
 
 // App is one proxied application.
 type App struct {
-	ID                string          `json:"id"`
-	Name              string          `json:"name"`
-	Hostnames         []string        `json:"hostnames"`
-	UpstreamURL       string          `json:"upstream_url"`
-	UpstreamTLSVerify bool            `json:"upstream_tls_verify"`
-	PreserveHost      bool            `json:"preserve_host"`
-	TrustedCIDRs      []string        `json:"trusted_cidrs"`
-	ClientIPHeader    string          `json:"client_ip_header"`
-	RetentionDays     int             `json:"retention_days"`
-	Capture           CapturePolicy   `json:"capture"`
-	Redaction         RedactionPolicy `json:"redaction"`
-	WAF               WAFPolicy       `json:"waf"`
-	Enabled           bool            `json:"enabled"`
-	CreatedAt         time.Time       `json:"created_at"`
-	UpdatedAt         time.Time       `json:"updated_at"`
+	ID                string   `json:"id"`
+	Name              string   `json:"name"`
+	Hostnames         []string `json:"hostnames"`
+	UpstreamURL       string   `json:"upstream_url"`
+	UpstreamTLSVerify bool     `json:"upstream_tls_verify"`
+	PreserveHost      bool     `json:"preserve_host"`
+	// HTTPOnly serves this application over plain HTTP only. The proxy
+	// presents no certificate for its hostnames and mints none, so a client
+	// reaching for TLS is refused rather than handed a certificate for a site
+	// that was never meant to have one.
+	HTTPOnly       bool            `json:"http_only"`
+	TrustedCIDRs   []string        `json:"trusted_cidrs"`
+	ClientIPHeader string          `json:"client_ip_header"`
+	RetentionDays  int             `json:"retention_days"`
+	Capture        CapturePolicy   `json:"capture"`
+	Redaction      RedactionPolicy `json:"redaction"`
+	WAF            WAFPolicy       `json:"waf"`
+	Enabled        bool            `json:"enabled"`
+	CreatedAt      time.Time       `json:"created_at"`
+	UpdatedAt      time.Time       `json:"updated_at"`
 
 	// trusted is the parsed form of TrustedCIDRs, precomputed when the app is
 	// loaded so the request path does no parsing.

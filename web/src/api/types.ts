@@ -198,6 +198,7 @@ export interface App {
   hostnames: string[]
   upstream_url: string
   upstream_tls_verify: boolean
+  http_only: boolean
   preserve_host: boolean
   trusted_cidrs: string[]
   client_ip_header: string

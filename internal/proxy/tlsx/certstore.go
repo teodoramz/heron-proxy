@@ -24,14 +24,51 @@ type certMap struct {
 	fallback *tls.Certificate
 }
 
+// plainSet holds the names of applications served over HTTP only.
+type plainSet struct {
+	exact    map[string]bool
+	wildcard map[string]bool
+}
+
+func (p *plainSet) has(name string) bool {
+	if p == nil {
+		return false
+	}
+	if p.exact[name] {
+		return true
+	}
+	_, parent, found := strings.Cut(name, ".")
+	return found && p.wildcard[parent]
+}
+
 // CertStore resolves certificates by SNI and can be replaced atomically.
 //
 // An uploaded certificate always wins. When none matches, the store falls back
 // to the authority and mints one for the name asked for, so an application can
 // be proxied without preparing a certificate first.
 type CertStore struct {
-	m  atomic.Pointer[certMap]
-	ca atomic.Pointer[CA]
+	m     atomic.Pointer[certMap]
+	ca    atomic.Pointer[CA]
+	plain atomic.Pointer[plainSet]
+}
+
+// SetPlainHosts marks names that must never be served over TLS. An uploaded
+// certificate still wins: naming a host here stops the proxy minting for it,
+// it does not withdraw a certificate somebody deliberately installed.
+func (s *CertStore) SetPlainHosts(names []string) {
+	p := &plainSet{exact: make(map[string]bool), wildcard: make(map[string]bool)}
+	for _, name := range names {
+		name = strings.ToLower(strings.TrimSpace(name))
+		if name == "" {
+			continue
+		}
+		if suffix, ok := strings.CutPrefix(name, "*."); ok {
+			p.wildcard[suffix] = true
+		} else {
+			p.exact[name] = true
+		}
+	}
+	s.plain.Store(p)
 }
 
 // NewCertStore returns an empty store.
@@ -90,6 +127,11 @@ func (s *CertStore) GetCertificate(chi *tls.ClientHelloInfo) (*tls.Certificate, 
 		if c, ok := m.wildcard[parent]; ok {
 			return c, nil
 		}
+	}
+	// An application marked HTTP only gets nothing beyond an uploaded
+	// certificate: no minted leaf, and not the catch-all either.
+	if s.plain.Load().has(name) {
+		return nil, ErrNoCertificate
 	}
 	// Before the catch-all deliberately: a certificate carrying the name that
 	// was asked for beats a valid certificate for some other name.

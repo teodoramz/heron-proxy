@@ -11,6 +11,7 @@ const BLANK = {
   client_ip_header: 'X-Real-IP',
   retention_days: 90,
   preserve_host: false,
+  http_only: false,
   upstream_tls_verify: true,
   paranoia_level: 1,
   threshold: 5,
@@ -47,6 +48,7 @@ export function Apps() {
         client_ip_header: form.client_ip_header,
         retention_days: Number(form.retention_days),
         preserve_host: form.preserve_host,
+        http_only: form.http_only,
         upstream_tls_verify: form.upstream_tls_verify,
         enabled: true,
         waf: {
@@ -133,6 +135,7 @@ export function Apps() {
                     <th>ID</th>
                     <th>Hostnames</th>
                     <th>Upstream</th>
+                    <th>Served on</th>
                     <th>Mode</th>
                     <th className="num">Paranoia</th>
                     <th className="num">Threshold</th>
@@ -146,6 +149,7 @@ export function Apps() {
                       <td>{a.id}</td>
                       <td>{a.hostnames.join(', ')}</td>
                       <td className="muted">{a.upstream_url}</td>
+                      <td className="muted">{a.http_only ? 'http' : 'http + https'}</td>
                       <td className={a.waf.mode === 'block' ? 'blocked-flag' : 'muted'}>
                         {a.waf.mode === 'block' ? 'enforcing' : 'detect only'}
                       </td>
@@ -246,7 +250,7 @@ export function Apps() {
                 />
                 Send the original Host header upstream
               </label>
-              <label className="row" style={{ gap: 6, marginBottom: 12 }}>
+              <label className="row" style={{ gap: 6, marginBottom: 8 }}>
                 <input
                   type="checkbox"
                   checked={form.upstream_tls_verify}
@@ -254,6 +258,19 @@ export function Apps() {
                 />
                 Verify the upstream TLS certificate
               </label>
+              <label className="row" style={{ gap: 6, marginBottom: 4 }}>
+                <input
+                  type="checkbox"
+                  checked={form.http_only}
+                  onChange={(e) => setForm({ ...form, http_only: e.target.checked })}
+                />
+                Serve this application over plain HTTP only
+              </label>
+              <span className="hint" style={{ display: 'block', marginBottom: 12 }}>
+                No certificate is minted for its hostnames, and none is presented. A client
+                reaching for HTTPS is refused rather than handed a certificate for a site that
+                was never meant to have one.
+              </span>
               <button className="btn btn-primary" type="submit">
                 Save application
               </button>

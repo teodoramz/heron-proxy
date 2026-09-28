@@ -332,6 +332,41 @@ func TestCertStoreFallsBackToTheAuthority(t *testing.T) {
 	}
 }
 
+func TestPlainHostsAreNeverMintedFor(t *testing.T) {
+	s := NewCertStore()
+	ca, _ := NewCA("heron test authority")
+	s.SetCA(ca)
+	catchAll := genCert(t, "catch.example")
+	s.Replace([]Cert{{Names: []string{"catch.example"}, Default: true, Cert: catchAll}})
+	s.SetPlainHosts([]string{"plain.example", "*.plain.test"})
+
+	for _, name := range []string{"plain.example", "one.plain.test"} {
+		if _, err := s.GetCertificate(&tls.ClientHelloInfo{ServerName: name}); !errors.Is(err, ErrNoCertificate) {
+			t.Errorf("%s: got %v, want ErrNoCertificate", name, err)
+		}
+	}
+
+	// Everything else still mints as before.
+	if _, err := s.GetCertificate(&tls.ClientHelloInfo{ServerName: "other.example"}); err != nil {
+		t.Errorf("a name that is not HTTP only failed: %v", err)
+	}
+}
+
+func TestPlainHostDoesNotWithdrawAnUploadedCertificate(t *testing.T) {
+	s := NewCertStore()
+	uploaded := genCert(t, "plain.example")
+	s.Replace([]Cert{{Names: []string{"plain.example"}, Cert: uploaded}})
+	s.SetPlainHosts([]string{"plain.example"})
+
+	got, err := s.GetCertificate(&tls.ClientHelloInfo{ServerName: "plain.example"})
+	if err != nil {
+		t.Fatalf("GetCertificate: %v", err)
+	}
+	if got != uploaded {
+		t.Error("an uploaded certificate was withheld")
+	}
+}
+
 // TestHandshakeWithMintedCertificate is the point of the authority: a client
 // that trusts it can complete a handshake for a name nobody uploaded.
 func TestHandshakeWithMintedCertificate(t *testing.T) {
