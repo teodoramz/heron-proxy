@@ -2,72 +2,28 @@
 
 A persistent MITM proxy and WAF traffic analyser.
 
-It terminates TLS for your applications, evaluates every request against the
-OWASP Core Rule Set, records the transaction, and forwards it to an upstream on
-any reachable host. Detection comes first: you read what the rules would have
-done before deciding whether to enforce it.
+It terminates TLS for your applications, checks every request against the OWASP
+Core Rule Set, records it, and forwards it to an upstream on any reachable host.
+Detection comes first: you read what the rules would have done before deciding
+whether to enforce it.
 
 > A heron stands in the current, watches everything pass, and strikes only when
 > it has decided.
 
 ![Architecture](docs/architecture.svg)
 
-## What it does
-
-- **Records every request** — method, path, query, all headers, and the body up
-  to a configurable cap. Response status, headers and size are kept; response
-  bodies are never read.
+- **Every request recorded** — method, path, query, all headers, body to a cap.
+  Response status, headers and size; never response bodies.
 - **Works before you prepare anything** — an application with no certificate is
-  served one minted by the proxy's own authority, carrying the name the client
-  asked for.
-- **Detects, then optionally enforces** — OWASP CRS 4 through
-  [Coraza](https://coraza.io). Per application: record what would have happened,
-  or reject at the threshold. The enforcement rule is the same score the
-  simulator reports.
-- **Attributes traffic honestly** — the true TCP peer and any claimed
-  `X-Forwarded-For` are both stored, and the claimed value is believed only from
-  a configured trusted proxy.
-- **Fingerprints clients** — JA3 and JA4 from the raw ClientHello, so a scanner
-  rotating addresses is still one actor.
-- **Loses nothing** — events are appended to an on-disk write-ahead log before
-  being acknowledged. `SIGKILL` the proxy under load and every event still ships
-  after restart.
-- **Answers questions fast** — ClickHouse with keyset pagination, so page 10,000
-  costs what page 1 costs.
-
-## What it looks like
-
-**Traffic** — every request, newest first. Plain-language filters, 28 selectable
-columns, resizable and sortable, keyset pagination, live tail.
-
-![Traffic](docs/screenshots/traffic.png)
-
-**Request detail** — the body, every header, and the whole request as raw HTTP,
-curl or HAR. Sensitive values are redacted on the way in.
-
-![Request detail](docs/screenshots/detail.png)
-
-**Rule tuning** — what enforcing would have cost at each threshold, and the
-rules that fired ranked by volume. Read a rule's matches, mark it a false
-positive, exclude it.
-
-![Rule tuning](docs/screenshots/tuning.png)
-
-**Dashboard** — volume, suspicious and rejected counts, latency percentiles,
-and the rules, sources and paths behind them.
-
-![Dashboard](docs/screenshots/dashboard.png)
-
-**Rules** — all 625 CRS rules, searchable by number, description or tag, each
-linking to its own matches in your traffic.
-
-![Rules](docs/screenshots/rules.png)
-
-**Applications** — hostnames, upstream, trusted proxies, paranoia, threshold,
-retention and enforcement mode. Certificates are uploaded here, or minted by
-the built-in authority.
-
-![Applications](docs/screenshots/apps.png)
+  served one minted by the proxy's own authority.
+- **Detects, then optionally enforces** — per application, on the same anomaly
+  score the simulator reports.
+- **Honest attribution** — the true TCP peer and any claimed `X-Forwarded-For`,
+  the latter believed only from a trusted proxy. JA3/JA4 from the ClientHello.
+- **Loses nothing** — events hit an on-disk write-ahead log before they are
+  acknowledged. `SIGKILL` under load and every one still ships.
+- **Fast to query** — ClickHouse with keyset pagination: page 10,000 costs what
+  page 1 costs.
 
 ## Quickstart
 
@@ -82,29 +38,64 @@ make up
 The UI is on <http://localhost:8081>. Sign in with the `ADMIN_USERNAME` and
 `ADMIN_PASSWORD` you set; that account is created on first start only.
 
-Then, in the UI:
-
-1. **Applications** — add an app: an identifier, the hostnames it answers on,
-   and the upstream URL. It works immediately over TLS, using a minted
-   certificate.
-2. Point DNS for those hostnames at the proxy. Traffic appears under **Traffic**.
-3. Optionally upload a real certificate, and install the proxy's authority
-   (**Applications → Certificate authority**) wherever you want no warnings.
-
 `ENCRYPTION_KEY` must be exactly 32 bytes. It encrypts certificate private keys
 at rest, and losing it makes stored certificates unreadable.
 
-## Enforcing
+## Add an application
+
+**Applications** → an identifier, the hostnames it answers on, and the upstream
+URL. Point DNS for those hostnames at the proxy. That is the whole setup.
+
+![Applications](docs/screenshots/apps.png)
+
+The upstream URL's scheme decides how the proxy reaches it: `https://` keeps TLS
+all the way, `http://` means the proxy terminates and forwards plaintext. Turn
+off **Verify upstream certificate** for self-signed internal services.
+
+Clients get a certificate you uploaded, or one the proxy mints for the name they
+asked for. Install the authority (**Applications → Certificate authority**)
+wherever you want no warnings.
+
+## Read the traffic
+
+![Traffic](docs/screenshots/traffic.png)
+
+Search, or build conditions in plain language. 28 columns, resizable and
+sortable, keyset pagination, live tail.
+
+Pick a time window: one of the quick ones, which keep sliding, or an exact start
+and end in your own timezone.
+
+![Time range](docs/screenshots/time-range.png)
+
+Opening a request shows the body, every header, and the whole thing as raw HTTP,
+curl or HAR. Sensitive values are redacted on the way in.
+
+![Request detail](docs/screenshots/detail.png)
+
+## Enforce
 
 Nothing is blocked until you say so, per application.
 
+![Rule tuning](docs/screenshots/tuning.png)
+
 1. Run in detection long enough to see normal traffic.
-2. **Rule tuning** ranks the rules that fired. Open the requests one matched,
-   decide whether it caught an attack or your own users, and exclude the ones
-   that are wrong.
-3. The threshold ladder shows what each threshold would have rejected over the
-   last week. Read the requests it names.
+2. **Rule tuning** ranks the rules that fired. Read what a rule matched, decide
+   whether it caught an attack or your own users, exclude the ones that are wrong.
+3. The threshold ladder shows what each threshold would have rejected this week.
 4. When you trust a threshold, set the application's mode to **Reject**.
+
+## Dashboard and rules
+
+Volume, suspicious and rejected counts, latency percentiles, and the rules,
+sources and paths behind them.
+
+![Dashboard](docs/screenshots/dashboard.png)
+
+All 625 CRS rules, searchable by number, description or tag, each linking to its
+own matches in your traffic.
+
+![Rules](docs/screenshots/rules.png)
 
 ## Documentation
 
@@ -115,21 +106,6 @@ Nothing is blocked until you say so, per application.
 | [Filters](docs/filters.md) | Every filterable field and operator |
 | [Rule tuning](docs/tuning.md) | False positives, exclusions, enabling enforcement |
 
-## Layout
-
-```
-cmd/proxy/            proxy entrypoint
-cmd/api/              api entrypoint
-internal/proxy/       tls peeking, ja3/ja4, routing, waf, capture, websocket
-internal/pipeline/    event, redaction, spool, blob store, ClickHouse writer
-internal/api/         query builder, reader, auth, handlers, alerts, live tail
-internal/store/       Postgres configuration store and migrations
-web/                  React UI
-deploy/               compose and Kubernetes manifests
-test/                 integration, load and lab traffic generators
-rules/                custom SecLang rules appended to CRS
-```
-
 ## Development
 
 ```bash
@@ -139,18 +115,10 @@ make lint           # gofmt and go vet
 cd web && npm run dev
 ```
 
-The full suite needs Postgres and ClickHouse:
-
-```bash
-docker run -d --name heron-pg -e POSTGRES_PASSWORD=test -e POSTGRES_DB=heron -p 55432:5432 postgres:16-alpine
-docker run -d --name heron-ch -e CLICKHOUSE_DB=heron -e CLICKHOUSE_PASSWORD=test \
-  -e CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1 -p 59000:9000 clickhouse/clickhouse-server:24.8-alpine
-make test-all
-```
-
-`test/lab/` holds traffic generators for a local lab: `crawler.py` for visitor
-traffic, `attacker.py` for eight campaigns of attack payloads. Both refuse any
-target that is not the local lab.
+`make test-all` needs Postgres and ClickHouse; see [Deployment](docs/deployment.md).
+`test/lab/` holds traffic generators: `crawler.py` for visitors, `attacker.py`
+for eight campaigns of attack payloads. Both refuse any target that is not the
+local lab.
 
 ## Roles
 
@@ -164,8 +132,7 @@ target that is not the local lab.
 
 - Response bodies are never recorded. Use Replay to fetch a current response.
 - WebSocket frames are not captured; the handshake and byte counts are.
-- One proxy node. Scaling out needs the broker-backed sink the pipeline is
-  structured for but does not yet ship.
+- One proxy node. Scaling out needs a broker-backed sink that does not yet ship.
 
 ## License
 
