@@ -25,15 +25,13 @@ const MAX_LIVE_ROWS = 2000
  * "View requests" on the tuning page lands here already filtered.
  */
 function initialFilter(params: URLSearchParams, limit: number): Filter {
-  const to = new Date()
   const conditions = []
   const rule = params.get('rule')
   if (rule) conditions.push({ field: 'rule_id', op: 'has' as const, value: Number(rule) })
   const app = params.get('app')
 
   return {
-    from: new Date(to.getTime() - (rule ? 7 * 24 : 1) * 60 * 60_000).toISOString(),
-    to: to.toISOString(),
+    range: rule ? 7 * 24 * 60 : 60,
     apps: app ? [app] : undefined,
     root: { op: 'and', conditions },
     limit,

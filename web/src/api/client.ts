@@ -36,15 +36,31 @@ export function rangeParams(from: Date, to: Date, extra: Record<string, string> 
   return new URLSearchParams({ from: from.toISOString(), to: to.toISOString(), ...extra }).toString()
 }
 
+/**
+ * resolveRange turns a relative window into the from/to the API expects, at
+ * the moment of the request. Every filter goes through it, so "last 15
+ * minutes" still means the last 15 minutes an hour after it was chosen.
+ */
+export function resolveRange(filter: Filter): Filter {
+  const { range, ...rest } = filter
+  if (!range) return rest
+  const to = new Date()
+  return {
+    ...rest,
+    from: new Date(to.getTime() - range * 60_000).toISOString(),
+    to: to.toISOString(),
+  }
+}
+
 export const api = {
   login: (username: string, password: string) =>
     post<{ user: User; csrf_token: string }>('/api/auth/login', { username, password }),
   logout: () => post<void>('/api/auth/logout'),
   me: () => request<{ user: User; apps: string[] }>('/api/me'),
 
-  searchTraffic: (filter: Filter) => post<Page>('/api/traffic/search', filter),
+  searchTraffic: (filter: Filter) => post<Page>('/api/traffic/search', resolveRange(filter)),
   countTraffic: (filter: Filter) =>
-    post<{ count: number; capped: boolean; cap: number }>('/api/traffic/count', filter),
+    post<{ count: number; capped: boolean; cap: number }>('/api/traffic/count', resolveRange(filter)),
   event: (id: string) => request<EventDetail>(`/api/traffic/${id}`),
   exportEvent: (id: string, format: 'raw' | 'curl' | 'har') =>
     fetch(`/api/traffic/${id}/export?format=${format}`, { credentials: 'same-origin' }).then((r) => r.text()),
@@ -55,17 +71,17 @@ export const api = {
   replay: (id: string, body: Record<string, unknown>) =>
     post<ReplayResult>(`/api/traffic/${id}/replay`, body),
 
-  summary: (filter: Filter) => post<Summary>('/api/stats/summary', filter),
+  summary: (filter: Filter) => post<Summary>('/api/stats/summary', resolveRange(filter)),
   series: (filter: Filter, bucket: string) =>
-    post<{ bucket: string; points: SeriesPoint[] }>(`/api/stats/series?bucket=${bucket}`, filter),
+    post<{ bucket: string; points: SeriesPoint[] }>(`/api/stats/series?bucket=${bucket}`, resolveRange(filter)),
   topRules: (filter: Filter, limit = 20) =>
-    post<{ rules: RuleStat[] }>(`/api/stats/rules?limit=${limit}`, filter),
+    post<{ rules: RuleStat[] }>(`/api/stats/rules?limit=${limit}`, resolveRange(filter)),
   topIPs: (filter: Filter, limit = 20) =>
-    post<{ ips: IPStat[] }>(`/api/stats/ips?limit=${limit}`, filter),
+    post<{ ips: IPStat[] }>(`/api/stats/ips?limit=${limit}`, resolveRange(filter)),
   topBy: (filter: Filter, field: string, limit = 20) =>
-    post<{ rows: GroupStat[] }>(`/api/stats/top/${field}?limit=${limit}`, filter),
+    post<{ rows: GroupStat[] }>(`/api/stats/top/${field}?limit=${limit}`, resolveRange(filter)),
   simulate: (filter: Filter, threshold: number) =>
-    post<Simulation>(`/api/simulate?threshold=${threshold}`, filter),
+    post<Simulation>(`/api/simulate?threshold=${threshold}`, resolveRange(filter)),
   ipProfile: (ip: string, query: string) =>
     request<IPProfile>(`/api/ip/${encodeURIComponent(ip)}?${query}`),
 

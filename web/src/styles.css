@@ -239,6 +239,35 @@ a:hover { text-decoration: underline; }
   margin: 0 2px;
 }
 
+.range-summary {
+  font-size: 12px;
+  color: var(--text-faint);
+  white-space: nowrap;
+  margin-left: 2px;
+}
+
+.range-editor {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  flex-basis: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 3px;
+  background: var(--surface-2);
+}
+
+.range-editor label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
+.range-editor input { width: auto; }
+
 .live-dot {
   width: 7px;
   height: 7px;

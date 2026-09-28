@@ -114,6 +114,12 @@ export interface Filter {
   cursor?: string
   sort?: string
   order?: 'asc' | 'desc'
+  /**
+   * Minutes back from now, when the window is relative. Held client-side and
+   * turned into from/to for each request, so the window keeps sliding; absent
+   * means from/to are fixed and stay where the user put them.
+   */
+  range?: number
 }
 
 export interface FieldSchema {

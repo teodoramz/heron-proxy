@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api } from '../api/client'
 import { ColumnPicker } from './ColumnPicker'
+import { TimeRange } from './TimeRange'
 import type { WidthMode } from './columns'
 import {
   COMMON_FIELDS,
@@ -32,14 +33,6 @@ interface Props {
   loading: boolean
   lastLoaded?: Date
 }
-
-const RANGES = [
-  { label: '15m', minutes: 15 },
-  { label: '1h', minutes: 60 },
-  { label: '6h', minutes: 360 },
-  { label: '24h', minutes: 1440 },
-  { label: '7d', minutes: 10080 },
-]
 
 /**
  * FilterBar is the whole query surface. A plain search box and one-click
@@ -96,16 +89,6 @@ export function FilterBar({
 
   function apply(next: Partial<Group>) {
     onChange({ ...filter, cursor: undefined, root: { ...filter.root, op: 'and', ...next } })
-  }
-
-  function setRange(minutes: number) {
-    const to = new Date()
-    onChange({
-      ...filter,
-      from: new Date(to.getTime() - minutes * 60_000).toISOString(),
-      to: to.toISOString(),
-      cursor: undefined,
-    })
   }
 
   function runSearch(e: React.FormEvent) {
@@ -188,11 +171,7 @@ export function FilterBar({
 
         <span className="divider" />
 
-        {RANGES.map((r) => (
-          <button key={r.label} type="button" className="btn btn-sm" onClick={() => setRange(r.minutes)}>
-            {r.label}
-          </button>
-        ))}
+        <TimeRange filter={filter} onChange={onChange} />
 
         <span className="spacer" />
 
