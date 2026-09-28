@@ -242,6 +242,12 @@ func (h *Handler) Annotate(w http.ResponseWriter, r *http.Request) {
 	}
 	a.EventID = r.PathValue("id")
 	a.UserID = session(r).User.ID
+	appID, err := h.eventApp(r, a.EventID)
+	if err != nil {
+		writeError(w, statusFor(err), err.Error())
+		return
+	}
+	a.AppID = appID
 	if !session(r).CanSeeApp(a.AppID) {
 		writeError(w, http.StatusForbidden, "no access to this app")
 		return
@@ -256,10 +262,25 @@ func (h *Handler) Annotate(w http.ResponseWriter, r *http.Request) {
 
 // Bookmarks lists events flagged for follow-up.
 func (h *Handler) Bookmarks(w http.ResponseWriter, r *http.Request) {
-	ids, err := h.Store.BookmarkedEventIDs(r.Context(), r.URL.Query().Get("app"), intParam(r, "limit", 100))
+	apps, err := appScope(r)
+	if err != nil {
+		writeError(w, http.StatusForbidden, err.Error())
+		return
+	}
+	ids, err := h.Store.BookmarkedEventIDs(r.Context(), apps, intParam(r, "limit", 100))
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"event_ids": ids})
+}
+
+// eventApp returns the app an event belongs to, so authorisation is decided by
+// the record rather than by what the caller claims.
+func (h *Handler) eventApp(r *http.Request, id string) (string, error) {
+	e, err := h.Reader.Get(r.Context(), id)
+	if err != nil {
+		return "", err
+	}
+	return e.AppID, nil
 }

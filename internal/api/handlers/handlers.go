@@ -124,6 +124,32 @@ func scopeToSession(f *query.Filter, r *http.Request) error {
 
 var errForbiddenScope = errors.New("no access to the requested apps")
 
+// appScope resolves which apps a request may read: the one it asked for, if
+// the caller may see it, otherwise the caller's whole grant. An empty result
+// means unrestricted, which is what an unscoped user gets.
+func appScope(r *http.Request) ([]string, error) {
+	s, ok := auth.FromContext(r.Context())
+	if !ok {
+		return nil, errors.New("no session")
+	}
+	if want := r.URL.Query().Get("app"); want != "" {
+		if !s.CanSeeApp(want) {
+			return nil, errForbiddenScope
+		}
+		return []string{want}, nil
+	}
+	return append([]string(nil), s.Apps...), nil
+}
+
+// requireAppAccess rejects a caller who may not act on appID.
+func requireAppAccess(w http.ResponseWriter, r *http.Request, appID string) bool {
+	if session(r).CanSeeApp(appID) {
+		return true
+	}
+	writeError(w, http.StatusForbidden, "no access to this app")
+	return false
+}
+
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)

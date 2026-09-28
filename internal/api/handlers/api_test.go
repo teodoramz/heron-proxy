@@ -490,6 +490,77 @@ func TestExclusionFlow(t *testing.T) {
 	}
 }
 
+// TestScopedUserCannotTouchAnotherAppsExclusion covers the whole exclusion
+// surface: a scoped analyst must not read, disable or delete tuning that
+// belongs to an app they were never granted.
+func TestScopedUserCannotTouchAnotherAppsExclusion(t *testing.T) {
+	h := newHarness(t)
+	owner := h.login(t, "owner", store.RoleAnalyst, nil)
+
+	var created struct {
+		ID string `json:"id"`
+	}
+	owner.decode(owner.do(http.MethodPost, "/api/exclusions", map[string]any{
+		"app_id": "api", "rule_id": 942100, "target": "ARGS:comment", "enabled": true,
+	}), http.StatusCreated, &created)
+
+	other := h.login(t, "scoped", store.RoleAnalyst, []string{"web"})
+
+	var list struct {
+		Exclusions []map[string]any `json:"exclusions"`
+	}
+	other.decode(other.get("/api/exclusions"), http.StatusOK, &list)
+	for _, e := range list.Exclusions {
+		if e["app_id"] != "web" {
+			t.Errorf("listed an exclusion for %v", e["app_id"])
+		}
+	}
+
+	resp := other.get("/api/exclusions?app=api")
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusForbidden {
+		t.Errorf("list by app = %d, want 403", resp.StatusCode)
+	}
+
+	resp = other.do(http.MethodPatch, "/api/exclusions/"+created.ID, map[string]any{"enabled": false})
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusForbidden {
+		t.Errorf("patch = %d, want 403", resp.StatusCode)
+	}
+
+	resp = other.do(http.MethodDelete, "/api/exclusions/"+created.ID, nil)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusForbidden {
+		t.Errorf("delete = %d, want 403", resp.StatusCode)
+	}
+}
+
+// TestVerdictAppComesFromTheEvent stops a scoped caller naming an app they can
+// see while marking an event that belongs to one they cannot.
+func TestVerdictAppComesFromTheEvent(t *testing.T) {
+	h := newHarness(t)
+	c := h.login(t, "scoped", store.RoleAnalyst, []string{"web"})
+
+	var apiEvent string
+	for _, e := range h.events {
+		if e.AppID == "api" {
+			apiEvent = e.ID
+			break
+		}
+	}
+	if apiEvent == "" {
+		t.Skip("no seeded event for the api app")
+	}
+
+	resp := c.do(http.MethodPost, "/api/traffic/"+apiEvent+"/verdict", map[string]any{
+		"app_id": "web", "rule_id": 942100, "verdict": "false_positive",
+	})
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusForbidden {
+		t.Errorf("verdict = %d, want 403", resp.StatusCode)
+	}
+}
+
 func TestExclusionRequiresRuleID(t *testing.T) {
 	h := newHarness(t)
 	c := h.login(t, "analyst", store.RoleAnalyst, nil)

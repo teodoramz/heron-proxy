@@ -8,7 +8,12 @@ import (
 
 // ListExclusions returns tuning exclusions, optionally for one app.
 func (h *Handler) ListExclusions(w http.ResponseWriter, r *http.Request) {
-	list, err := h.Store.ListExclusions(r.Context(), r.URL.Query().Get("app"))
+	apps, err := appScope(r)
+	if err != nil {
+		writeError(w, http.StatusForbidden, err.Error())
+		return
+	}
+	list, err := h.Store.ListExclusions(r.Context(), apps)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -22,6 +27,9 @@ func (h *Handler) PreviewExclusion(w http.ResponseWriter, r *http.Request) {
 	var e store.Exclusion
 	if err := decodeBody(r, &e); err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if !requireAppAccess(w, r, e.AppID) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"seclang": store.BuildSecLang(e, 10000000)})
@@ -39,8 +47,7 @@ func (h *Handler) CreateExclusion(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "rule_id is required")
 		return
 	}
-	if !session(r).CanSeeApp(e.AppID) {
-		writeError(w, http.StatusForbidden, "no access to this app")
+	if !requireAppAccess(w, r, e.AppID) {
 		return
 	}
 	e.CreatedBy = session(r).User.ID
@@ -63,6 +70,9 @@ func (h *Handler) SetExclusionEnabled(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id := r.PathValue("id")
+	if !h.mayChangeExclusion(w, r, id) {
+		return
+	}
 	if err := h.Store.SetExclusionEnabled(r.Context(), id, req.Enabled); err != nil {
 		writeError(w, statusFor(err), err.Error())
 		return
@@ -74,6 +84,9 @@ func (h *Handler) SetExclusionEnabled(w http.ResponseWriter, r *http.Request) {
 // DeleteExclusion removes an exclusion.
 func (h *Handler) DeleteExclusion(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
+	if !h.mayChangeExclusion(w, r, id) {
+		return
+	}
 	if err := h.Store.DeleteExclusion(r.Context(), id); err != nil {
 		writeError(w, statusFor(err), err.Error())
 		return
@@ -91,10 +104,18 @@ func (h *Handler) MarkFP(w http.ResponseWriter, r *http.Request) {
 	}
 	m.EventID = r.PathValue("id")
 	m.UserID = session(r).User.ID
-	if !session(r).CanSeeApp(m.AppID) {
-		writeError(w, http.StatusForbidden, "no access to this app")
+	// The app comes from the event, not the request: otherwise a caller could
+	// name an app they can see while marking an event belonging to one they
+	// cannot.
+	appID, err := h.eventApp(r, m.EventID)
+	if err != nil {
+		writeError(w, statusFor(err), err.Error())
 		return
 	}
+	if !requireAppAccess(w, r, appID) {
+		return
+	}
+	m.AppID = appID
 	saved, err := h.Store.SaveFPMark(r.Context(), m)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
@@ -106,10 +127,26 @@ func (h *Handler) MarkFP(w http.ResponseWriter, r *http.Request) {
 
 // FPSummaries aggregates verdicts per rule for the tuning queue.
 func (h *Handler) FPSummaries(w http.ResponseWriter, r *http.Request) {
-	sums, err := h.Store.FPSummaries(r.Context(), r.URL.Query().Get("app"))
+	apps, err := appScope(r)
+	if err != nil {
+		writeError(w, http.StatusForbidden, err.Error())
+		return
+	}
+	sums, err := h.Store.FPSummaries(r.Context(), apps)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"summaries": sums})
+}
+
+// mayChangeExclusion reports whether the caller may alter the exclusion, which
+// depends on the app it belongs to rather than on anything they sent.
+func (h *Handler) mayChangeExclusion(w http.ResponseWriter, r *http.Request, id string) bool {
+	appID, err := h.Store.ExclusionApp(r.Context(), id)
+	if err != nil {
+		writeError(w, statusFor(err), err.Error())
+		return false
+	}
+	return requireAppAccess(w, r, appID)
 }

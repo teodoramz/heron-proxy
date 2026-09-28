@@ -2,9 +2,12 @@ package store
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 )
 
 // Exclusion is a generated CRS tuning directive for one app.
@@ -83,13 +86,13 @@ func unpackTarget(stored string) (target, path string) {
 }
 
 // ListExclusions returns exclusions, optionally filtered to one app.
-func (s *Store) ListExclusions(ctx context.Context, appID string) ([]Exclusion, error) {
+func (s *Store) ListExclusions(ctx context.Context, apps []string) ([]Exclusion, error) {
 	rows, err := s.pool.Query(ctx, `
 		SELECT id, COALESCE(app_id, ''), rule_id, target, reason, seclang, enabled,
 		       COALESCE(created_by::text, ''), created_at
 		FROM rule_exclusions
-		WHERE ($1 = '' OR app_id = $1)
-		ORDER BY created_at DESC`, appID)
+		WHERE (coalesce(cardinality($1::text[]), 0) = 0 OR app_id = ANY($1))
+		ORDER BY created_at DESC`, apps)
 	if err != nil {
 		return nil, fmt.Errorf("store: list exclusions: %w", err)
 	}
@@ -112,7 +115,7 @@ func (s *Store) ListExclusions(ctx context.Context, appID string) ([]Exclusion, 
 // ExclusionRules renders every enabled exclusion for an app as SecLang, with
 // unique IDs assigned to the path-scoped ones.
 func (s *Store) ExclusionRules(ctx context.Context, appID string) ([]string, error) {
-	exclusions, err := s.ListExclusions(ctx, appID)
+	exclusions, err := s.ListExclusions(ctx, []string{appID})
 	if err != nil {
 		return nil, err
 	}
@@ -126,6 +129,21 @@ func (s *Store) ExclusionRules(ctx context.Context, appID string) ([]string, err
 		genID++
 	}
 	return out, nil
+}
+
+// ExclusionApp returns the app an exclusion belongs to, so a caller can be
+// checked against it before changing it.
+func (s *Store) ExclusionApp(ctx context.Context, id string) (string, error) {
+	var appID string
+	err := s.pool.QueryRow(ctx,
+		`SELECT COALESCE(app_id, '') FROM rule_exclusions WHERE id = $1`, id).Scan(&appID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", ErrNotFound
+	}
+	if err != nil {
+		return "", fmt.Errorf("store: exclusion app: %w", err)
+	}
+	return appID, nil
 }
 
 // SetExclusionEnabled toggles an exclusion.
@@ -189,16 +207,16 @@ type FPSummary struct {
 }
 
 // FPSummaries aggregates verdicts per rule, most false positives first.
-func (s *Store) FPSummaries(ctx context.Context, appID string) ([]FPSummary, error) {
+func (s *Store) FPSummaries(ctx context.Context, apps []string) ([]FPSummary, error) {
 	rows, err := s.pool.Query(ctx, `
 		SELECT app_id, rule_id,
 			count(*) FILTER (WHERE verdict = 'false_positive'),
 			count(*) FILTER (WHERE verdict = 'true_positive'),
 			count(*) FILTER (WHERE verdict = 'unsure')
 		FROM fp_marks
-		WHERE ($1 = '' OR app_id = $1)
+		WHERE (coalesce(cardinality($1::text[]), 0) = 0 OR app_id = ANY($1))
 		GROUP BY app_id, rule_id
-		ORDER BY 3 DESC`, appID)
+		ORDER BY 3 DESC`, apps)
 	if err != nil {
 		return nil, fmt.Errorf("store: fp summaries: %w", err)
 	}
@@ -295,11 +313,11 @@ func (s *Store) AnnotationsForEvents(ctx context.Context, eventIDs []string) (ma
 }
 
 // BookmarkedEventIDs returns the events flagged for follow-up.
-func (s *Store) BookmarkedEventIDs(ctx context.Context, appID string, limit int) ([]string, error) {
+func (s *Store) BookmarkedEventIDs(ctx context.Context, apps []string, limit int) ([]string, error) {
 	rows, err := s.pool.Query(ctx, `
 		SELECT event_id::text FROM event_annotations
-		WHERE bookmarked AND ($1 = '' OR app_id = $1)
-		ORDER BY updated_at DESC LIMIT $2`, appID, limit)
+		WHERE bookmarked AND (coalesce(cardinality($1::text[]), 0) = 0 OR app_id = ANY($1))
+		ORDER BY updated_at DESC LIMIT $2`, apps, limit)
 	if err != nil {
 		return nil, fmt.Errorf("store: bookmarks: %w", err)
 	}

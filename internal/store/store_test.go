@@ -389,7 +389,7 @@ func TestExclusionRoundTripAndRendering(t *testing.T) {
 	}
 	disabled, _ := s.SaveExclusion(ctx, Exclusion{AppID: "api", RuleID: 930120, Enabled: false})
 
-	list, err := s.ListExclusions(ctx, "api")
+	list, err := s.ListExclusions(ctx, []string{"api"})
 	if err != nil {
 		t.Fatalf("ListExclusions: %v", err)
 	}
@@ -479,7 +479,7 @@ func TestFPMarkUpsertAndSummary(t *testing.T) {
 		t.Errorf("verdict = %q", marks[eventID][0].Verdict)
 	}
 
-	sums, _ := s.FPSummaries(ctx, "api")
+	sums, _ := s.FPSummaries(ctx, []string{"api"})
 	if len(sums) != 1 || sums[0].FalsePositive != 1 {
 		t.Errorf("summaries = %+v", sums)
 	}
@@ -519,7 +519,7 @@ func TestAnnotationsAndBookmarks(t *testing.T) {
 	if len(got[id].Tags) != 2 {
 		t.Errorf("Tags = %v", got[id].Tags)
 	}
-	ids, _ := s.BookmarkedEventIDs(ctx, "api", 10)
+	ids, _ := s.BookmarkedEventIDs(ctx, []string{"api"}, 10)
 	if len(ids) != 1 || ids[0] != id {
 		t.Errorf("BookmarkedEventIDs = %v", ids)
 	}
