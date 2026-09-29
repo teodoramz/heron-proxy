@@ -27,7 +27,11 @@ type AlertRule struct {
 	TargetURL string         `json:"target_url"`
 	// Template is the message body, rendered per event. Empty means the
 	// channel's built-in wording.
-	Template        string     `json:"template"`
+	Template string `json:"template"`
+	// PostAs and PostIcon name the poster on a chat channel that allows an
+	// integration to override it. Empty leaves the receiver's own default.
+	PostAs          string     `json:"post_as"`
+	PostIcon        string     `json:"post_icon"`
 	ThrottleSeconds int        `json:"throttle_seconds"`
 	Enabled         bool       `json:"enabled"`
 	LastFiredAt     *time.Time `json:"last_fired_at,omitempty"`
@@ -42,15 +46,16 @@ func (s *Store) SaveAlertRule(ctx context.Context, r AlertRule) (AlertRule, erro
 	}
 	if r.ID == "" {
 		err = s.pool.QueryRow(ctx, `
-			INSERT INTO alert_rules (name, app_id, condition, channel, target_url, throttle_seconds, enabled, template)
-			VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id, created_at`,
-			r.Name, nullable(r.AppID), cond, r.Channel, r.TargetURL, r.ThrottleSeconds, r.Enabled, r.Template).
+			INSERT INTO alert_rules (name, app_id, condition, channel, target_url, throttle_seconds, enabled, template, post_as, post_icon)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id, created_at`,
+			r.Name, nullable(r.AppID), cond, r.Channel, r.TargetURL, r.ThrottleSeconds, r.Enabled, r.Template, r.PostAs, r.PostIcon).
 			Scan(&r.ID, &r.CreatedAt)
 	} else {
 		_, err = s.pool.Exec(ctx, `
 			UPDATE alert_rules SET name=$2, app_id=$3, condition=$4, channel=$5,
-				target_url=$6, throttle_seconds=$7, enabled=$8, template=$9 WHERE id=$1`,
-			r.ID, r.Name, nullable(r.AppID), cond, r.Channel, r.TargetURL, r.ThrottleSeconds, r.Enabled, r.Template)
+				target_url=$6, throttle_seconds=$7, enabled=$8, template=$9,
+				post_as=$10, post_icon=$11 WHERE id=$1`,
+			r.ID, r.Name, nullable(r.AppID), cond, r.Channel, r.TargetURL, r.ThrottleSeconds, r.Enabled, r.Template, r.PostAs, r.PostIcon)
 	}
 	if err != nil {
 		return AlertRule{}, fmt.Errorf("store: save alert rule: %w", err)
@@ -62,7 +67,7 @@ func (s *Store) SaveAlertRule(ctx context.Context, r AlertRule) (AlertRule, erro
 func (s *Store) ListAlertRules(ctx context.Context) ([]AlertRule, error) {
 	rows, err := s.pool.Query(ctx, `
 		SELECT id, name, COALESCE(app_id,''), condition, channel, target_url,
-		       throttle_seconds, enabled, template, last_fired_at, created_at
+		       throttle_seconds, enabled, template, post_as, post_icon, last_fired_at, created_at
 		FROM alert_rules ORDER BY name`)
 	if err != nil {
 		return nil, fmt.Errorf("store: list alert rules: %w", err)
@@ -74,7 +79,8 @@ func (s *Store) ListAlertRules(ctx context.Context) ([]AlertRule, error) {
 		var r AlertRule
 		var cond []byte
 		if err := rows.Scan(&r.ID, &r.Name, &r.AppID, &cond, &r.Channel, &r.TargetURL,
-			&r.ThrottleSeconds, &r.Enabled, &r.Template, &r.LastFiredAt, &r.CreatedAt); err != nil {
+			&r.ThrottleSeconds, &r.Enabled, &r.Template, &r.PostAs, &r.PostIcon,
+			&r.LastFiredAt, &r.CreatedAt); err != nil {
 			return nil, err
 		}
 		_ = json.Unmarshal(cond, &r.Condition)

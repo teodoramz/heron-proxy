@@ -276,6 +276,8 @@ function AlertForm({
   const [channel, setChannel] = useState<AlertRule['channel']>(rule?.channel ?? 'webhook')
   const [url, setUrl] = useState(rule?.target_url ?? '')
   const [template, setTemplate] = useState(rule?.template ?? '')
+  const [postAs, setPostAs] = useState(rule?.post_as ?? '')
+  const [postIcon, setPostIcon] = useState(rule?.post_icon ?? '')
   const [minAnomaly, setMinAnomaly] = useState(rule?.condition?.min_anomaly ?? 5)
   const [throttle, setThrottle] = useState(rule?.throttle_seconds ?? 300)
   const [enabled, setEnabled] = useState(rule?.enabled ?? true)
@@ -290,6 +292,8 @@ function AlertForm({
     channel,
     target_url: url,
     template,
+    post_as: postAs,
+    post_icon: postIcon,
     throttle_seconds: throttle,
     enabled,
     condition: { min_anomaly: minAnomaly },
@@ -311,7 +315,7 @@ function AlertForm({
     }, 400)
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [template, channel, appId, name])
+  }, [template, channel, appId, name, postAs, postIcon])
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -420,6 +424,36 @@ function AlertForm({
           </button>
         )}
       </div>
+
+      {channel === 'mattermost' && (
+        <div className="row" style={{ gap: 8, alignItems: 'flex-end', marginTop: 10, flexWrap: 'wrap' }}>
+          <div className="field" style={{ marginBottom: 0 }}>
+            <label htmlFor={`alert-postas-${rule?.id ?? 'new'}`}>Post as (optional)</label>
+            <input
+              id={`alert-postas-${rule?.id ?? 'new'}`}
+              className="input"
+              placeholder="Heron"
+              value={postAs}
+              onChange={(e) => setPostAs(e.target.value)}
+            />
+          </div>
+          <div className="field" style={{ marginBottom: 0 }}>
+            <label htmlFor={`alert-posticon-${rule?.id ?? 'new'}`}>Icon (optional)</label>
+            <input
+              id={`alert-posticon-${rule?.id ?? 'new'}`}
+              className="input"
+              placeholder="bird, or an image URL"
+              value={postIcon}
+              onChange={(e) => setPostIcon(e.target.value)}
+            />
+          </div>
+          <span className="hint" style={{ flex: '1 1 340px' }}>
+            Mattermost posts as whoever created the incoming webhook. These replace that name and
+            picture, but only if the server has <code>EnablePostUsernameOverride</code> and{' '}
+            <code>EnablePostIconOverride</code> turned on; otherwise it ignores them.
+          </span>
+        </div>
+      )}
 
       <div className="two-col" style={{ marginTop: 10 }}>
         <div className="field" style={{ marginBottom: 0 }}>

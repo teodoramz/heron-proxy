@@ -442,3 +442,48 @@ func TestPreviewOfAWebhookTemplateIsTheBody(t *testing.T) {
 		t.Errorf("got %+v", out)
 	}
 }
+
+func TestPostAsAndIconAreSentWhenSet(t *testing.T) {
+	for _, tc := range []struct {
+		name, icon, wantKey, wantValue string
+	}{
+		{"emoji shorthand", "bird", "icon_emoji", ":bird:"},
+		{"emoji already wrapped", ":robot_face:", "icon_emoji", ":robot_face:"},
+		{"an image url", "https://example.com/heron.png", "icon_url", "https://example.com/heron.png"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			body, err := Preview(store.AlertRule{
+				Channel: "mattermost", Name: "sqli", PostAs: "Heron", PostIcon: tc.icon,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			var out map[string]string
+			if err := json.Unmarshal(body, &out); err != nil {
+				t.Fatal(err)
+			}
+			if out["username"] != "Heron" {
+				t.Errorf("username = %q", out["username"])
+			}
+			if out[tc.wantKey] != tc.wantValue {
+				t.Errorf("%s = %q, want %q", tc.wantKey, out[tc.wantKey], tc.wantValue)
+			}
+		})
+	}
+}
+
+// Left empty, the receiver keeps its own default rather than being handed a
+// blank name.
+func TestPostAsIsOmittedWhenEmpty(t *testing.T) {
+	body, err := Preview(store.AlertRule{Channel: "mattermost", Name: "sqli"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out map[string]string
+	if err := json.Unmarshal(body, &out); err != nil {
+		t.Fatal(err)
+	}
+	if len(out) != 1 || out["text"] == "" {
+		t.Errorf("payload = %v, want only a text field", out)
+	}
+}

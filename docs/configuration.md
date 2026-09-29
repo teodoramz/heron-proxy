@@ -58,6 +58,7 @@ Postgres and is edited in the UI.
 | `channel` | `webhook` or `mattermost`. Mattermost receives `{"text": ...}`, capped at its 16383-character post limit; a webhook receives the alert as JSON. |
 | `template` | Optional message body, rendered per event with Go template syntax: `{{.Method}} {{.Host}}{{.Path}} from {{.ClientIP}}`. Empty means the default wording. On a plain webhook the rendered text is the entire request body, so any JSON the receiver expects can be written out. Fields are those of the alert payload: `Alert`, `AppID`, `EventID`, `TS`, `ClientIP`, `Method`, `Host`, `Path`, `Status`, `Anomaly`, `WouldBlock`, `RuleIDs`, `RuleTags`. |
 | | Edit a rule from **Settings → Alerts → Edit**. The panel beside the message shows the exact body that would be posted for a sample request, rendered by the same code that sends it. |
+| `post_as`, `post_icon` | Mattermost only. Replace the name and picture the post appears under — by default whoever created the incoming webhook. The icon is an emoji name (`bird` or `:bird:`) or an image URL. Both need the server's `EnablePostUsernameOverride` and `EnablePostIconOverride` turned on; without them Mattermost ignores the fields. |
 
 ## Per-application policy
 

@@ -245,7 +245,21 @@ func buildPayload(rule store.AlertRule, ev event.Event) ([]byte, error) {
 
 	switch rule.Channel {
 	case "mattermost":
-		return json.Marshal(map[string]string{"text": clamp(text, limitMattermost)})
+		body := map[string]string{"text": clamp(text, limitMattermost)}
+		// Mattermost only honours these when the server allows integrations to
+		// override the poster; it ignores them otherwise, so sending them is
+		// safe either way.
+		if rule.PostAs != "" {
+			body["username"] = rule.PostAs
+		}
+		if icon := rule.PostIcon; icon != "" {
+			if strings.HasPrefix(icon, "http://") || strings.HasPrefix(icon, "https://") {
+				body["icon_url"] = icon
+			} else {
+				body["icon_emoji"] = emojiName(icon)
+			}
+		}
+		return json.Marshal(body)
 	default:
 		// A template on a plain webhook is the whole body, so any shape the
 		// receiver wants can be written out directly.
@@ -305,6 +319,12 @@ func sampleEvent(appID string) event.Event {
 		RuleIDs:      []uint32{942100, 941160, 913100},
 		RuleTags:     []string{"attack-sqli", "attack-xss"},
 	}
+}
+
+// emojiName normalises an emoji to the :name: form Mattermost expects, so
+// either "bird" or ":bird:" works.
+func emojiName(icon string) string {
+	return ":" + strings.Trim(icon, ": ") + ":"
 }
 
 // limitMattermost is the server's default MaxPostSize. Over it Mattermost

@@ -238,6 +238,8 @@ export interface AlertRule {
   app_id: string
   channel: 'webhook' | 'mattermost'
   template?: string
+  post_as?: string
+  post_icon?: string
   target_url: string
   throttle_seconds: number
   enabled: boolean
