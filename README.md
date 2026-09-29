@@ -54,7 +54,10 @@ off **Verify upstream certificate** for self-signed internal services.
 
 Clients get a certificate you uploaded, or one the proxy mints for the name they
 asked for. Install the authority (**Applications → Certificate authority**)
-wherever you want no warnings.
+wherever you want no warnings. Tick **HTTP only** for an application that should
+not be served over TLS at all: nothing is minted for its hostnames, and a client
+reaching for HTTPS is refused rather than handed a certificate for a site that
+was never meant to have one.
 
 ## Read the traffic
 

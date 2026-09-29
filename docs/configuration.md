@@ -63,6 +63,7 @@ Set in the UI, stored in Postgres, applied by the proxy on its next poll.
 | `upstream_url` | Absolute `http` or `https` URL. Any reachable host. |
 | `upstream_tls_verify` | Verify the upstream certificate. Off for self-signed internal services. The scheme of `upstream_url` decides whether TLS is used at all. |
 | `preserve_host` | Send the client's `Host` upstream instead of the upstream's own. |
+| `http_only` | Serve over plain HTTP only. No certificate is minted for its hostnames and none is presented, so a client reaching for TLS is refused. An uploaded certificate still wins. |
 | `client_ip_header` | Header carrying the real client address. Default `X-Real-IP`. |
 | `trusted_cidrs` | Ranges whose `X-Forwarded-For` is believed. Empty means trust none. |
 | `retention_days` | Overrides the 90-day default for this app's events. |
