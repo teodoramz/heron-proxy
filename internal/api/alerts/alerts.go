@@ -13,6 +13,7 @@ import (
 	"sync"
 	"text/template"
 	"time"
+	"unicode/utf8"
 
 	"github.com/amzteodor/heron/internal/pipeline/event"
 	"github.com/amzteodor/heron/internal/store"
@@ -242,11 +243,8 @@ func buildPayload(rule store.AlertRule, ev event.Event) ([]byte, error) {
 	}
 
 	switch rule.Channel {
-	// Mattermost and Slack both read "text"; Discord reads "content".
-	case "slack", "mattermost":
-		return json.Marshal(map[string]string{"text": text})
-	case "discord":
-		return json.Marshal(map[string]string{"content": text})
+	case "mattermost":
+		return json.Marshal(map[string]string{"text": clamp(text, limitMattermost)})
 	default:
 		// A template on a plain webhook is the whole body, so any shape the
 		// receiver wants can be written out directly.
@@ -279,6 +277,29 @@ func ValidTemplate(tmpl string) error {
 	}
 	_, err := render(tmpl, Payload{TS: time.Now()})
 	return err
+}
+
+// limitMattermost is the server's default MaxPostSize. Over it Mattermost
+// answers 400 and the notification is simply lost, which is the worst way to
+// find out.
+const limitMattermost = 16383
+
+// clamp keeps a message within what the service accepts, and never returns an
+// empty one: Discord rejects a webhook with nothing to post.
+func clamp(text string, limit int) string {
+	if strings.TrimSpace(text) == "" {
+		return "(no message)"
+	}
+	if len(text) <= limit {
+		return text
+	}
+	const ellipsis = "…"
+	// Cut on a rune boundary, so the message stays valid UTF-8.
+	cut := limit - len(ellipsis)
+	for cut > 0 && !utf8.RuneStart(text[cut]) {
+		cut--
+	}
+	return text[:cut] + ellipsis
 }
 
 func summarize(p Payload) string {

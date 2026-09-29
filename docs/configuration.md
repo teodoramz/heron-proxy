@@ -55,7 +55,7 @@ Postgres and is edited in the UI.
 
 | Field | Purpose |
 | --- | --- |
-| `channel` | `webhook`, `slack`, `mattermost` or `discord`. Slack and Mattermost read `text`; Discord reads `content`. |
+| `channel` | `webhook` or `mattermost`. Mattermost receives `{"text": ...}`, capped at its 16383-character post limit; a webhook receives the alert as JSON. |
 | `template` | Optional message body, rendered per event with Go template syntax: `{{.Method}} {{.Host}}{{.Path}} from {{.ClientIP}}`. Empty means the default wording. On a plain webhook the rendered text is the entire request body, so any JSON the receiver expects can be written out. Fields are those of the alert payload: `Alert`, `AppID`, `EventID`, `TS`, `ClientIP`, `Method`, `Host`, `Path`, `Status`, `Anomaly`, `WouldBlock`, `RuleIDs`, `RuleTags`. |
 
 ## Per-application policy

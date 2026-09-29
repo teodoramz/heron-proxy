@@ -10,6 +10,7 @@ import (
 	"sync"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/amzteodor/heron/internal/pipeline/event"
 	"github.com/amzteodor/heron/internal/store"
@@ -267,26 +268,17 @@ func deliver(t *testing.T, rule store.AlertRule) string {
 	return rec.first()
 }
 
-// Each chat service reads a different field, so sending both was only ever
-// working by accident.
-func TestChatPayloadShape(t *testing.T) {
-	for _, tc := range []struct{ channel, field string }{
-		{"slack", "text"},
-		{"mattermost", "text"},
-		{"discord", "content"},
-	} {
-		t.Run(tc.channel, func(t *testing.T) {
-			var body map[string]string
-			if err := json.Unmarshal([]byte(deliver(t, store.AlertRule{Name: "sqli", Channel: tc.channel})), &body); err != nil {
-				t.Fatal(err)
-			}
-			if !strings.Contains(body[tc.field], "/v1/login") {
-				t.Errorf("%s = %q", tc.field, body[tc.field])
-			}
-			if len(body) != 1 {
-				t.Errorf("payload carries %d fields, want only %q", len(body), tc.field)
-			}
-		})
+// Mattermost reads "text" and nothing else.
+func TestMattermostPayloadShape(t *testing.T) {
+	var body map[string]string
+	if err := json.Unmarshal([]byte(deliver(t, store.AlertRule{Name: "sqli", Channel: "mattermost"})), &body); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(body["text"], "/v1/login") {
+		t.Errorf("text = %q", body["text"])
+	}
+	if len(body) != 1 {
+		t.Errorf("payload carries %d fields, want only \"text\"", len(body))
 	}
 }
 
@@ -359,5 +351,48 @@ func TestDeliveryFailureDoesNotMarkFired(t *testing.T) {
 	time.Sleep(300 * time.Millisecond)
 	if rules.firedCount() != 0 {
 		t.Errorf("failed delivery marked as fired %d times", rules.firedCount())
+	}
+}
+
+// Mattermost rejects a post over MaxPostSize with a 400, losing the
+// notification, so the message is cut to fit before it is sent.
+func TestLongMessageIsCutToTheLimit(t *testing.T) {
+	raw := deliver(t, store.AlertRule{
+		Name: "sqli", Channel: "mattermost",
+		Template: "{{.Path}}" + strings.Repeat("x", limitMattermost+100),
+	})
+	var body map[string]string
+	if err := json.Unmarshal([]byte(raw), &body); err != nil {
+		t.Fatal(err)
+	}
+	if len(body["text"]) > limitMattermost {
+		t.Errorf("message is %d bytes, over the %d limit", len(body["text"]), limitMattermost)
+	}
+	if !utf8.ValidString(body["text"]) {
+		t.Error("cut left invalid UTF-8")
+	}
+}
+
+// Mattermost refuses a post with nothing in it, so an empty render must not be
+// sent as-is.
+func TestEmptyMessageIsNotSentEmpty(t *testing.T) {
+	raw := deliver(t, store.AlertRule{Name: "sqli", Channel: "mattermost", Template: "{{.Host}}"})
+	var body map[string]string
+	if err := json.Unmarshal([]byte(raw), &body); err != nil {
+		t.Fatal(err)
+	}
+	if body["text"] == "" {
+		t.Error("an empty text field was sent")
+	}
+}
+
+func TestClampCutsOnARuneBoundary(t *testing.T) {
+	// Multi-byte runes either side of the cut.
+	got := clamp(strings.Repeat("é", 100), 21)
+	if !utf8.ValidString(got) {
+		t.Fatalf("invalid UTF-8: %q", got)
+	}
+	if len(got) > 21 {
+		t.Errorf("%d bytes, over the limit", len(got))
 	}
 }

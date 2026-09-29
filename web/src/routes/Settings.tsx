@@ -293,9 +293,7 @@ function NewAlert({ apps, onSaved }: { apps: App[]; onSaved: () => void }) {
             onChange={(e) => setChannel(e.target.value as typeof channel)}
           >
             <option value="webhook">webhook</option>
-            <option value="slack">slack</option>
             <option value="mattermost">mattermost</option>
-            <option value="discord">discord</option>
           </select>
         </div>
         <div className="field" style={{ marginBottom: 0 }}>
@@ -334,9 +332,9 @@ function NewAlert({ apps, onSaved }: { apps: App[]; onSaved: () => void }) {
           <code>{'{{.AppID}}'}</code> <code>{'{{.EventID}}'}</code> <code>{'{{.ClientIP}}'}</code>{' '}
           <code>{'{{.Method}}'}</code> <code>{'{{.Host}}'}</code> <code>{'{{.Path}}'}</code>{' '}
           <code>{'{{.Status}}'}</code> <code>{'{{.Anomaly}}'}</code>{' '}
-          <code>{'{{.WouldBlock}}'}</code> <code>{'{{.RuleIDs}}'}</code>. On slack, mattermost and
-          discord this becomes the message text; on a plain webhook it is the whole request body,
-          so you can write any JSON the receiver expects.
+          <code>{'{{.WouldBlock}}'}</code> <code>{'{{.RuleIDs}}'}</code>. On mattermost this becomes the
+          message text; on a plain webhook it is the whole request body, so you can write any JSON
+          the receiver expects.
         </span>
       </div>
     </form>
