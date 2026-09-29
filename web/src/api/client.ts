@@ -132,7 +132,11 @@ export const api = {
   deleteUser: (id: string) => request<void>(`/api/users/${id}`, { method: 'DELETE' }),
 
   alerts: () => request<{ alerts: AlertRule[] }>('/api/alerts'),
-  saveAlert: (body: Partial<AlertRule>) => post<AlertRule>('/api/alerts', body),
+  saveAlert: (body: Partial<AlertRule>) =>
+    body.id
+      ? request<AlertRule>(`/api/alerts/${body.id}`, { method: 'PUT', body: JSON.stringify(body) })
+      : post<AlertRule>('/api/alerts', body),
+  previewAlert: (body: Partial<AlertRule>) => post<{ body: string }>('/api/alerts/preview', body),
   deleteAlert: (id: string) => request<void>(`/api/alerts/${id}`, { method: 'DELETE' }),
 
   audit: () => request<{ entries: AuditEntry[] }>('/api/audit'),

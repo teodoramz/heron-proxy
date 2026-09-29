@@ -396,3 +396,49 @@ func TestClampCutsOnARuneBoundary(t *testing.T) {
 		t.Errorf("%d bytes, over the limit", len(got))
 	}
 }
+
+// Preview must go through the same builder as a delivery, or it would show
+// something other than what gets posted.
+func TestPreviewMatchesWhatIsSent(t *testing.T) {
+	rule := store.AlertRule{
+		Name: "sqli", Channel: "mattermost", AppID: "shop",
+		Template: "{{.AppID}} scored {{.Anomaly}} on {{.Path}}",
+	}
+	body, err := Preview(rule)
+	if err != nil {
+		t.Fatalf("Preview: %v", err)
+	}
+	var out map[string]string
+	if err := json.Unmarshal(body, &out); err != nil {
+		t.Fatalf("preview is not the JSON that would be sent: %v (%s)", err, body)
+	}
+	if !strings.Contains(out["text"], "shop scored 25") {
+		t.Errorf("text = %q", out["text"])
+	}
+}
+
+func TestPreviewReportsABrokenTemplate(t *testing.T) {
+	if _, err := Preview(store.AlertRule{Channel: "mattermost", Template: "{{.Nope}}"}); err == nil {
+		t.Error("a broken template previewed without error")
+	}
+}
+
+// A webhook template writes the body itself, so the preview is that body.
+func TestPreviewOfAWebhookTemplateIsTheBody(t *testing.T) {
+	body, err := Preview(store.AlertRule{
+		Channel: "webhook", Template: `{"ip": "{{.ClientIP}}", "score": {{.Anomaly}}}`,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out struct {
+		IP    string `json:"ip"`
+		Score int    `json:"score"`
+	}
+	if err := json.Unmarshal(body, &out); err != nil {
+		t.Fatalf("not the JSON the template wrote: %v (%s)", err, body)
+	}
+	if out.IP == "" || out.Score != 25 {
+		t.Errorf("got %+v", out)
+	}
+}

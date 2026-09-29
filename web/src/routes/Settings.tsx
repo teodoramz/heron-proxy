@@ -7,6 +7,7 @@ export function Settings() {
   const [alerts, setAlerts] = useState<AlertRule[]>([])
   const [apps, setApps] = useState<App[]>([])
   const [audit, setAudit] = useState<AuditEntry[]>([])
+  const [editing, setEditing] = useState('')
   const [error, setError] = useState('')
 
   const reload = useCallback(() => {
@@ -88,20 +89,27 @@ export function Settings() {
                     <th>Name</th>
                     <th>App</th>
                     <th>Channel</th>
+                    <th>Message</th>
                     <th>Last fired</th>
-                    <th />
+                    <th className="actions" />
                   </tr>
                 </thead>
                 <tbody>
                   {alerts.map((a) => (
                     <tr key={a.id}>
-                      <td>{a.name}</td>
+                      <td title={a.name}>{a.name}</td>
                       <td className="muted">{a.app_id || 'all'}</td>
                       <td>{a.channel}</td>
+                      <td className="clip" title={a.template || 'default wording'}>
+                        {a.template ? 'custom' : 'default'}
+                      </td>
                       <td className="muted">
                         {a.last_fired_at ? new Date(a.last_fired_at).toLocaleString() : 'never'}
                       </td>
-                      <td className="num">
+                      <td className="actions nowrap">
+                        <button className="btn btn-sm" onClick={() => setEditing(editing === a.id ? '' : a.id)}>
+                          {editing === a.id ? 'Close' : 'Edit'}
+                        </button>{' '}
                         <button className="btn btn-sm btn-danger" onClick={() => api.deleteAlert(a.id).then(reload)}>
                           Remove
                         </button>
@@ -111,7 +119,22 @@ export function Settings() {
                 </tbody>
               </table>
             )}
-            <NewAlert apps={apps} onSaved={reload} />
+            {editing ? (
+              // Keyed so switching rules remounts the form: without it React
+              // reuses the instance and keeps the previous rule's values.
+              <AlertForm
+                key={editing}
+                apps={apps}
+                rule={alerts.find((a) => a.id === editing)}
+                onSaved={() => {
+                  setEditing('')
+                  reload()
+                }}
+                onCancel={() => setEditing('')}
+              />
+            ) : (
+              <AlertForm key="new" apps={apps} onSaved={reload} />
+            )}
           </div>
         </section>
 
@@ -232,32 +255,74 @@ function NewUser({ apps, onSaved }: { apps: App[]; onSaved: () => void }) {
   )
 }
 
-function NewAlert({ apps, onSaved }: { apps: App[]; onSaved: () => void }) {
-  const [name, setName] = useState('')
-  const [appId, setAppId] = useState('')
-  const [channel, setChannel] = useState<AlertRule['channel']>('webhook')
-  const [url, setUrl] = useState('')
-  const [template, setTemplate] = useState('')
-  const [minAnomaly, setMinAnomaly] = useState(5)
+/**
+ * AlertForm creates a rule or edits one in place. The preview shows the exact
+ * body that would be posted, rendered by the same code that sends it, so a
+ * custom message can be checked before it goes anywhere.
+ */
+function AlertForm({
+  apps,
+  rule,
+  onSaved,
+  onCancel,
+}: {
+  apps: App[]
+  rule?: AlertRule
+  onSaved: () => void
+  onCancel?: () => void
+}) {
+  const [name, setName] = useState(rule?.name ?? '')
+  const [appId, setAppId] = useState(rule?.app_id ?? '')
+  const [channel, setChannel] = useState<AlertRule['channel']>(rule?.channel ?? 'webhook')
+  const [url, setUrl] = useState(rule?.target_url ?? '')
+  const [template, setTemplate] = useState(rule?.template ?? '')
+  const [minAnomaly, setMinAnomaly] = useState(rule?.condition?.min_anomaly ?? 5)
+  const [throttle, setThrottle] = useState(rule?.throttle_seconds ?? 300)
+  const [enabled, setEnabled] = useState(rule?.enabled ?? true)
   const [error, setError] = useState('')
+  const [preview, setPreview] = useState('')
+
+  const draft = (): AlertRule => ({
+    ...(rule ?? {}),
+    id: rule?.id ?? '',
+    name,
+    app_id: appId,
+    channel,
+    target_url: url,
+    template,
+    throttle_seconds: throttle,
+    enabled,
+    condition: { min_anomaly: minAnomaly },
+  })
+
+  // Re-render the preview as the message is typed, but only once typing pauses.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      api
+        .previewAlert(draft())
+        .then((r) => {
+          setPreview(r.body)
+          setError('')
+        })
+        .catch((e) => {
+          setPreview('')
+          setError((e as Error).message)
+        })
+    }, 400)
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [template, channel, appId, name])
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
     try {
-      await api.saveAlert({
-        name,
-        app_id: appId,
-        channel,
-        target_url: url,
-        template,
-        throttle_seconds: 300,
-        enabled: true,
-        condition: { min_anomaly: minAnomaly },
-      })
-      setName('')
-      setUrl('')
-      setTemplate('')
+      await api.saveAlert(draft())
+      if (!rule) {
+        setName('')
+        setUrl('')
+        setTemplate('')
+      }
       onSaved()
     } catch (err) {
       setError((err as Error).message)
@@ -266,16 +331,27 @@ function NewAlert({ apps, onSaved }: { apps: App[]; onSaved: () => void }) {
 
   return (
     <form onSubmit={submit} style={{ marginTop: 14 }}>
-      <h3 style={{ fontSize: 13 }}>Add an alert</h3>
+      <h3 style={{ fontSize: 13 }}>{rule ? `Edit “${rule.name}”` : 'Add an alert'}</h3>
       {error && <p className="error-msg">{error}</p>}
       <div className="row" style={{ gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
         <div className="field" style={{ marginBottom: 0 }}>
-          <label htmlFor="alert-name">Name</label>
-          <input id="alert-name" className="input" value={name} onChange={(e) => setName(e.target.value)} required />
+          <label htmlFor={`alert-name-${rule?.id ?? 'new'}`}>Name</label>
+          <input
+            id={`alert-name-${rule?.id ?? 'new'}`}
+            className="input"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+          />
         </div>
         <div className="field" style={{ marginBottom: 0 }}>
-          <label htmlFor="alert-app">App</label>
-          <select id="alert-app" className="select" value={appId} onChange={(e) => setAppId(e.target.value)}>
+          <label htmlFor={`alert-app-${rule?.id ?? 'new'}`}>App</label>
+          <select
+            id={`alert-app-${rule?.id ?? 'new'}`}
+            className="select"
+            value={appId}
+            onChange={(e) => setAppId(e.target.value)}
+          >
             <option value="">All apps</option>
             {apps.map((a) => (
               <option key={a.id} value={a.id}>
@@ -285,25 +361,32 @@ function NewAlert({ apps, onSaved }: { apps: App[]; onSaved: () => void }) {
           </select>
         </div>
         <div className="field" style={{ marginBottom: 0 }}>
-          <label htmlFor="alert-channel">Channel</label>
+          <label htmlFor={`alert-channel-${rule?.id ?? 'new'}`}>Channel</label>
           <select
-            id="alert-channel"
+            id={`alert-channel-${rule?.id ?? 'new'}`}
             className="select"
             value={channel}
-            onChange={(e) => setChannel(e.target.value as typeof channel)}
+            onChange={(e) => setChannel(e.target.value as AlertRule['channel'])}
           >
             <option value="webhook">webhook</option>
             <option value="mattermost">mattermost</option>
           </select>
         </div>
-        <div className="field" style={{ marginBottom: 0 }}>
-          <label htmlFor="alert-url">Target URL</label>
-          <input id="alert-url" className="input" type="url" value={url} onChange={(e) => setUrl(e.target.value)} required />
+        <div className="field" style={{ marginBottom: 0, flex: '1 1 260px' }}>
+          <label htmlFor={`alert-url-${rule?.id ?? 'new'}`}>Target URL</label>
+          <input
+            id={`alert-url-${rule?.id ?? 'new'}`}
+            className="input"
+            type="url"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            required
+          />
         </div>
         <div className="field" style={{ marginBottom: 0 }}>
-          <label htmlFor="alert-anomaly">Anomaly at least</label>
+          <label htmlFor={`alert-anomaly-${rule?.id ?? 'new'}`}>Anomaly at least</label>
           <input
-            id="alert-anomaly"
+            id={`alert-anomaly-${rule?.id ?? 'new'}`}
             className="input"
             style={{ width: 80 }}
             type="number"
@@ -311,31 +394,65 @@ function NewAlert({ apps, onSaved }: { apps: App[]; onSaved: () => void }) {
             onChange={(e) => setMinAnomaly(Number(e.target.value))}
           />
         </div>
+        <div className="field" style={{ marginBottom: 0 }}>
+          <label htmlFor={`alert-throttle-${rule?.id ?? 'new'}`}>No more than every</label>
+          <input
+            id={`alert-throttle-${rule?.id ?? 'new'}`}
+            className="input"
+            style={{ width: 90 }}
+            type="number"
+            min={1}
+            value={throttle}
+            onChange={(e) => setThrottle(Number(e.target.value))}
+            title="Seconds between notifications from this rule"
+          />
+        </div>
+        <label className="row" style={{ gap: 6, marginBottom: 0 }}>
+          <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
+          Enabled
+        </label>
         <button className="btn btn-primary" type="submit">
-          Add alert
+          {rule ? 'Save changes' : 'Add alert'}
         </button>
+        {onCancel && (
+          <button className="btn" type="button" onClick={onCancel}>
+            Cancel
+          </button>
+        )}
       </div>
 
-      <div className="field" style={{ marginTop: 10, maxWidth: 620 }}>
-        <label htmlFor="alert-template">Message (optional)</label>
-        <textarea
-          id="alert-template"
-          className="textarea"
-          rows={3}
-          placeholder={'{{.Method}} {{.Host}}{{.Path}} from {{.ClientIP}} scored {{.Anomaly}}'}
-          value={template}
-          onChange={(e) => setTemplate(e.target.value)}
-          spellCheck={false}
-        />
-        <span className="hint">
-          Leave empty for the default wording. Fields: <code>{'{{.Alert}}'}</code>{' '}
-          <code>{'{{.AppID}}'}</code> <code>{'{{.EventID}}'}</code> <code>{'{{.ClientIP}}'}</code>{' '}
-          <code>{'{{.Method}}'}</code> <code>{'{{.Host}}'}</code> <code>{'{{.Path}}'}</code>{' '}
-          <code>{'{{.Status}}'}</code> <code>{'{{.Anomaly}}'}</code>{' '}
-          <code>{'{{.WouldBlock}}'}</code> <code>{'{{.RuleIDs}}'}</code>. On mattermost this becomes the
-          message text; on a plain webhook it is the whole request body, so you can write any JSON
-          the receiver expects.
-        </span>
+      <div className="two-col" style={{ marginTop: 10 }}>
+        <div className="field" style={{ marginBottom: 0 }}>
+          <label htmlFor={`alert-template-${rule?.id ?? 'new'}`}>Message (optional)</label>
+          <textarea
+            id={`alert-template-${rule?.id ?? 'new'}`}
+            className="textarea"
+            rows={7}
+            placeholder={'{{.Method}} {{.Host}}{{.Path}} from {{.ClientIP}} scored {{.Anomaly}}'}
+            value={template}
+            onChange={(e) => setTemplate(e.target.value)}
+            spellCheck={false}
+          />
+          <span className="hint">
+            Leave empty for the default wording. Fields: <code>{'{{.Alert}}'}</code>{' '}
+            <code>{'{{.AppID}}'}</code> <code>{'{{.EventID}}'}</code> <code>{'{{.ClientIP}}'}</code>{' '}
+            <code>{'{{.Method}}'}</code> <code>{'{{.Host}}'}</code> <code>{'{{.Path}}'}</code>{' '}
+            <code>{'{{.Status}}'}</code> <code>{'{{.Anomaly}}'}</code>{' '}
+            <code>{'{{.WouldBlock}}'}</code> <code>{'{{.RuleIDs}}'}</code>. On mattermost this
+            becomes the message text; on a plain webhook it is the whole request body, so you can
+            write any JSON the receiver expects.
+          </span>
+        </div>
+        <div className="field" style={{ marginBottom: 0 }}>
+          <label>What gets posted</label>
+          <pre className="code" style={{ margin: 0, minHeight: 130, maxHeight: 260 }}>
+            {preview || '—'}
+          </pre>
+          <span className="hint">
+            The body for a sample request that would match this rule, built by the same code that
+            sends it.
+          </span>
+        </div>
       </div>
     </form>
   )

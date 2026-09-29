@@ -102,6 +102,21 @@ func (h *Handler) SaveAlert(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, saved)
 }
 
+// PreviewAlert renders the body a rule would post, without saving or sending.
+func (h *Handler) PreviewAlert(w http.ResponseWriter, r *http.Request) {
+	var rule store.AlertRule
+	if err := decodeBody(r, &rule); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	body, err := alerts.Preview(rule)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"body": string(body)})
+}
+
 // DeleteAlert removes an alert rule.
 func (h *Handler) DeleteAlert(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")

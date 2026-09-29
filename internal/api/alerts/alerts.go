@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/netip"
 	"strings"
 	"sync"
 	"text/template"
@@ -277,6 +278,33 @@ func ValidTemplate(tmpl string) error {
 	}
 	_, err := render(tmpl, Payload{TS: time.Now()})
 	return err
+}
+
+// Preview renders the body a rule would post, for an event that looks like one
+// the rule would match. It goes through the same builder as a real delivery,
+// so what is shown is what would be sent.
+func Preview(rule store.AlertRule) ([]byte, error) {
+	return buildPayload(rule, sampleEvent(rule.AppID))
+}
+
+func sampleEvent(appID string) event.Event {
+	if appID == "" {
+		appID = "shop"
+	}
+	return event.Event{
+		ID:           "0b6f5f6c-1f2a-4a8e-9d3b-6c7e2f4a1b90",
+		TS:           time.Now().UTC(),
+		AppID:        appID,
+		ClientIP:     netip.MustParseAddr("203.0.113.42"),
+		Method:       "POST",
+		Host:         appID + ".example.com",
+		Path:         "/checkout/submit",
+		Status:       403,
+		AnomalyScore: 25,
+		WouldBlock:   true,
+		RuleIDs:      []uint32{942100, 941160, 913100},
+		RuleTags:     []string{"attack-sqli", "attack-xss"},
+	}
 }
 
 // limitMattermost is the server's default MaxPostSize. Over it Mattermost

@@ -121,6 +121,7 @@ func NewRouter(o Options) http.Handler {
 	mux.Handle("DELETE /api/users/{id}", admin(http.HandlerFunc(h.DeleteUser)))
 	mux.Handle("GET /api/alerts", admin(http.HandlerFunc(h.ListAlerts)))
 	mux.Handle("POST /api/alerts", admin(http.HandlerFunc(h.SaveAlert)))
+	mux.Handle("POST /api/alerts/preview", admin(http.HandlerFunc(h.PreviewAlert)))
 	mux.Handle("PUT /api/alerts/{id}", admin(http.HandlerFunc(h.SaveAlert)))
 	mux.Handle("DELETE /api/alerts/{id}", admin(http.HandlerFunc(h.DeleteAlert)))
 	mux.Handle("GET /api/audit", admin(http.HandlerFunc(h.ListAudit)))
