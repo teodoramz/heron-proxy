@@ -545,7 +545,7 @@ pre.code {
    shrink and pushes the whole row off the screen. */
 .two-col > *, .panel { min-width: 0; }
 
-table.data { width: 100%; min-width: 480px; border-collapse: collapse; font-size: 12px; }
+table.data { width: 100%; min-width: 320px; border-collapse: collapse; font-size: 12px; }
 table.data th { text-align: left; color: var(--text-dim); font-weight: 600; padding: 4px 8px; border-bottom: 1px solid var(--line); font-size: 11px; white-space: nowrap; }
 table.data td { padding: 4px 8px; border-bottom: 1px solid var(--line); font-family: var(--font-data); }
 table.data tr:last-child td { border-bottom: 0; }
