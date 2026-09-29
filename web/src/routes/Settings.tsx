@@ -474,10 +474,11 @@ function AlertForm({
             <code>{'{{.Method}}'}</code> <code>{'{{.Host}}'}</code> <code>{'{{.Path}}'}</code>{' '}
             <code>{'{{.Status}}'}</code> <code>{'{{.Anomaly}}'}</code>{' '}
             <code>{'{{.WouldBlock}}'}</code> <code>{'{{.RuleIDs}}'}</code>{' '}
-            <code>{'{{.RuleTags}}'}</code>.
+            <code>{'{{.RuleTags}}'}</code> <code>{'{{.AttackTags}}'}</code>.
             <br />
-            A list prints as <code>[a b c]</code>; <code>{'{{join ", " .RuleTags}}'}</code> reads
-            better. On mattermost the result becomes the message text; on a plain webhook it is the
+            <code>{'{{.RuleTags}}'}</code> includes the rule set's own taxonomy;{' '}
+            <code>{'{{.AttackTags}}'}</code> is the attack categories alone. A list prints as{' '}
+            <code>[a b c]</code>, so <code>{'{{join ", " .AttackTags}}'}</code> reads better. On mattermost the result becomes the message text; on a plain webhook it is the
             whole request body, so you can write any JSON the receiver expects.
           </span>
         </div>

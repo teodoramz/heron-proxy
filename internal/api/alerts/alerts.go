@@ -226,6 +226,11 @@ type Payload struct {
 	WouldBlock bool      `json:"would_block"`
 	RuleIDs    []uint32  `json:"rule_ids,omitempty"`
 	RuleTags   []string  `json:"rule_tags,omitempty"`
+	// AttackTags is the attack categories alone, without the "attack-" prefix
+	// the Core Rule Set gives them. RuleTags also carries CRS taxonomy entries
+	// such as paranoia-level/1 and capec/1000/152/242, which are rarely what
+	// someone wants in a message.
+	AttackTags []string `json:"attack_tags,omitempty"`
 }
 
 func buildPayload(rule store.AlertRule, ev event.Event) ([]byte, error) {
@@ -234,7 +239,7 @@ func buildPayload(rule store.AlertRule, ev event.Event) ([]byte, error) {
 		ClientIP: ev.ClientIP.String(), Method: ev.Method, Host: ev.Host, Path: ev.Path,
 		UserAgent: ev.UserAgent,
 		Status:    ev.Status, Anomaly: ev.AnomalyScore, WouldBlock: ev.WouldBlock,
-		RuleIDs: ev.RuleIDs, RuleTags: ev.RuleTags,
+		RuleIDs: ev.RuleIDs, RuleTags: ev.RuleTags, AttackTags: attackTags(ev.RuleTags),
 	}
 
 	text := summarize(p)
@@ -340,8 +345,23 @@ func sampleEvent(appID string) event.Event {
 		AnomalyScore: 25,
 		WouldBlock:   true,
 		RuleIDs:      []uint32{942100, 941160, 913100},
-		RuleTags:     []string{"attack-sqli", "attack-xss"},
+		RuleTags: []string{
+			"OWASP_CRS", "OWASP_CRS/ATTACK-SQLI", "application-multi",
+			"attack-sqli", "attack-xss", "attack-reputation-scanner",
+			"capec/1000/152/242", "paranoia-level/1",
+		},
 	}
+}
+
+// attackTags keeps the CRS attack categories, without their prefix.
+func attackTags(tags []string) []string {
+	var out []string
+	for _, t := range tags {
+		if name, ok := strings.CutPrefix(t, "attack-"); ok && name != "" {
+			out = append(out, name)
+		}
+	}
+	return out
 }
 
 // emojiName normalises an emoji to the :name: form Mattermost expects, so

@@ -535,3 +535,47 @@ func TestJoinLeavesOtherValuesAlone(t *testing.T) {
 		t.Errorf("text = %q", out["text"])
 	}
 }
+
+// The Core Rule Set tags a request with its taxonomy as well as its attack
+// categories; AttackTags is the half worth putting in a message.
+func TestAttackTagsKeepsOnlyTheCategories(t *testing.T) {
+	body, err := Preview(store.AlertRule{
+		Channel: "mattermost", Template: `{{join ", " .AttackTags}}`,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out map[string]string
+	if err := json.Unmarshal(body, &out); err != nil {
+		t.Fatal(err)
+	}
+	got := out["text"]
+	for _, want := range []string{"sqli", "xss", "reputation-scanner"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("%q is missing %q", got, want)
+		}
+	}
+	for _, unwanted := range []string{"attack-", "paranoia-level", "capec/", "OWASP_CRS"} {
+		if strings.Contains(got, unwanted) {
+			t.Errorf("%q still carries %q", got, unwanted)
+		}
+	}
+}
+
+func TestAttackTagsIsEmptyWhenNothingMatched(t *testing.T) {
+	ev := testEvent()
+	ev.RuleTags = []string{"paranoia-level/1", "platform-multi"}
+	body, err := buildPayload(store.AlertRule{
+		Channel: "mattermost", Template: `[{{join ", " .AttackTags}}]`,
+	}, ev)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out map[string]string
+	if err := json.Unmarshal(body, &out); err != nil {
+		t.Fatal(err)
+	}
+	if out["text"] != "[]" {
+		t.Errorf("text = %q", out["text"])
+	}
+}
