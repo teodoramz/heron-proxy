@@ -469,12 +469,16 @@ function AlertForm({
           />
           <span className="hint">
             Leave empty for the default wording. Fields: <code>{'{{.Alert}}'}</code>{' '}
-            <code>{'{{.AppID}}'}</code> <code>{'{{.EventID}}'}</code> <code>{'{{.ClientIP}}'}</code>{' '}
+            <code>{'{{.AppID}}'}</code> <code>{'{{.EventID}}'}</code> <code>{'{{.TS}}'}</code>{' '}
+            <code>{'{{.ClientIP}}'}</code> <code>{'{{.UserAgent}}'}</code>{' '}
             <code>{'{{.Method}}'}</code> <code>{'{{.Host}}'}</code> <code>{'{{.Path}}'}</code>{' '}
             <code>{'{{.Status}}'}</code> <code>{'{{.Anomaly}}'}</code>{' '}
-            <code>{'{{.WouldBlock}}'}</code> <code>{'{{.RuleIDs}}'}</code>. On mattermost this
-            becomes the message text; on a plain webhook it is the whole request body, so you can
-            write any JSON the receiver expects.
+            <code>{'{{.WouldBlock}}'}</code> <code>{'{{.RuleIDs}}'}</code>{' '}
+            <code>{'{{.RuleTags}}'}</code>.
+            <br />
+            A list prints as <code>[a b c]</code>; <code>{'{{join ", " .RuleTags}}'}</code> reads
+            better. On mattermost the result becomes the message text; on a plain webhook it is the
+            whole request body, so you can write any JSON the receiver expects.
           </span>
         </div>
         <div className="field" style={{ marginBottom: 0 }}>

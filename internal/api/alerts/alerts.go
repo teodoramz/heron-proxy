@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/netip"
+	"strconv"
 	"strings"
 	"sync"
 	"text/template"
@@ -219,6 +220,7 @@ type Payload struct {
 	Method     string    `json:"method"`
 	Host       string    `json:"host"`
 	Path       string    `json:"path"`
+	UserAgent  string    `json:"user_agent"`
 	Status     uint16    `json:"status"`
 	Anomaly    uint16    `json:"anomaly_score"`
 	WouldBlock bool      `json:"would_block"`
@@ -230,7 +232,8 @@ func buildPayload(rule store.AlertRule, ev event.Event) ([]byte, error) {
 	p := Payload{
 		Alert: rule.Name, AppID: ev.AppID, EventID: ev.ID, TS: ev.TS,
 		ClientIP: ev.ClientIP.String(), Method: ev.Method, Host: ev.Host, Path: ev.Path,
-		Status: ev.Status, Anomaly: ev.AnomalyScore, WouldBlock: ev.WouldBlock,
+		UserAgent: ev.UserAgent,
+		Status:    ev.Status, Anomaly: ev.AnomalyScore, WouldBlock: ev.WouldBlock,
 		RuleIDs: ev.RuleIDs, RuleTags: ev.RuleTags,
 	}
 
@@ -270,10 +273,29 @@ func buildPayload(rule store.AlertRule, ev event.Event) ([]byte, error) {
 	}
 }
 
+// funcs are the helpers a template may use. Go prints a slice as [a b c],
+// which is rarely what someone wants in a message.
+var funcs = template.FuncMap{
+	"join": func(sep string, v any) string {
+		switch xs := v.(type) {
+		case []string:
+			return strings.Join(xs, sep)
+		case []uint32:
+			parts := make([]string, len(xs))
+			for i, x := range xs {
+				parts[i] = strconv.FormatUint(uint64(x), 10)
+			}
+			return strings.Join(parts, sep)
+		default:
+			return fmt.Sprint(v)
+		}
+	},
+}
+
 // render fills a rule's template from the event. Fields are named as in
 // Payload, for example {{.Method}} {{.Host}}{{.Path}} from {{.ClientIP}}.
 func render(tmpl string, p Payload) (string, error) {
-	t, err := template.New("alert").Option("missingkey=error").Parse(tmpl)
+	t, err := template.New("alert").Funcs(funcs).Option("missingkey=error").Parse(tmpl)
 	if err != nil {
 		return "", fmt.Errorf("alerts: template: %w", err)
 	}
@@ -313,6 +335,7 @@ func sampleEvent(appID string) event.Event {
 		Method:       "POST",
 		Host:         appID + ".example.com",
 		Path:         "/checkout/submit",
+		UserAgent:    "sqlmap/1.9.2#stable (https://sqlmap.org)",
 		Status:       403,
 		AnomalyScore: 25,
 		WouldBlock:   true,

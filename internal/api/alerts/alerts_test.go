@@ -487,3 +487,51 @@ func TestPostAsIsOmittedWhenEmpty(t *testing.T) {
 		t.Errorf("payload = %v, want only a text field", out)
 	}
 }
+
+func TestUserAgentAndTagsAreAvailable(t *testing.T) {
+	body, err := Preview(store.AlertRule{
+		Channel:  "mattermost",
+		Template: "{{.UserAgent}} | {{join \", \" .RuleTags}} | {{join \"+\" .RuleIDs}}",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out map[string]string
+	if err := json.Unmarshal(body, &out); err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"sqlmap/", "attack-sqli, attack-xss", "942100+941160+913100"} {
+		if !strings.Contains(out["text"], want) {
+			t.Errorf("text %q is missing %q", out["text"], want)
+		}
+	}
+}
+
+// The user agent reaches the payload from the event, not just the sample.
+func TestUserAgentComesFromTheEvent(t *testing.T) {
+	ev := testEvent()
+	ev.UserAgent = "Nikto/2.5.0"
+	body, err := buildPayload(store.AlertRule{Channel: "mattermost", Template: "{{.UserAgent}}"}, ev)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out map[string]string
+	if err := json.Unmarshal(body, &out); err != nil {
+		t.Fatal(err)
+	}
+	if out["text"] != "Nikto/2.5.0" {
+		t.Errorf("text = %q", out["text"])
+	}
+}
+
+func TestJoinLeavesOtherValuesAlone(t *testing.T) {
+	body, err := Preview(store.AlertRule{Channel: "mattermost", Template: `{{join ", " .Status}}`})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out map[string]string
+	_ = json.Unmarshal(body, &out)
+	if out["text"] != "403" {
+		t.Errorf("text = %q", out["text"])
+	}
+}
