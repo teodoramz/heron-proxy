@@ -68,7 +68,7 @@ func TestListTraffic(t *testing.T) {
 	var page struct {
 		Events []map[string]any `json:"events"`
 	}
-	c.decode(c.get("/api/traffic?from=2026-04-01T00:00:00Z&to=2026-04-02T00:00:00Z"), http.StatusOK, &page)
+	c.decode(c.get("/api/traffic?"+seedRange()), http.StatusOK, &page)
 	if len(page.Events) != 3 {
 		t.Fatalf("got %d events, want 3", len(page.Events))
 	}
@@ -79,8 +79,8 @@ func TestTrafficSearchWithFilter(t *testing.T) {
 	c := h.login(t, "analyst", store.RoleAnalyst, nil)
 
 	filter := map[string]any{
-		"from": "2026-04-01T00:00:00Z",
-		"to":   "2026-04-02T00:00:00Z",
+		"from": seedTime.Add(-time.Hour).Format(time.RFC3339),
+		"to":   seedTime.Add(time.Hour).Format(time.RFC3339),
 		"root": map[string]any{
 			"op": "and",
 			"conditions": []map[string]any{
@@ -121,7 +121,7 @@ func TestAppScopingHidesOtherApps(t *testing.T) {
 	var page struct {
 		Events []map[string]any `json:"events"`
 	}
-	c.decode(c.get("/api/traffic?from=2026-04-01T00:00:00Z&to=2026-04-02T00:00:00Z"), http.StatusOK, &page)
+	c.decode(c.get("/api/traffic?"+seedRange()), http.StatusOK, &page)
 	if len(page.Events) != 1 {
 		t.Fatalf("got %d events, want only the web app's", len(page.Events))
 	}
@@ -136,7 +136,7 @@ func TestScopedUserCannotWidenScope(t *testing.T) {
 	h := newHarness(t)
 	c := h.login(t, "scoped", store.RoleAnalyst, []string{"web"})
 
-	resp := c.get("/api/traffic?app=api&from=2026-04-01T00:00:00Z&to=2026-04-02T00:00:00Z")
+	resp := c.get("/api/traffic?app=api&" + seedRange())
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusForbidden {
 		t.Errorf("status = %d, want 403", resp.StatusCode)
@@ -203,7 +203,7 @@ func TestCount(t *testing.T) {
 		Count  int  `json:"count"`
 		Capped bool `json:"capped"`
 	}
-	c.decode(c.get("/api/traffic/count?from=2026-04-01T00:00:00Z&to=2026-04-02T00:00:00Z"), http.StatusOK, &out)
+	c.decode(c.get("/api/traffic/count?"+seedRange()), http.StatusOK, &out)
 	if out.Count != 3 || out.Capped {
 		t.Errorf("count = %d capped = %v", out.Count, out.Capped)
 	}
@@ -212,7 +212,7 @@ func TestCount(t *testing.T) {
 func TestStatsEndpoints(t *testing.T) {
 	h := newHarness(t)
 	c := h.login(t, "reader", store.RoleAnalyst, nil)
-	rng := "?from=2026-04-01T00:00:00Z&to=2026-04-02T00:00:00Z"
+	rng := "?" + seedRange()
 
 	var summary struct {
 		Requests int `json:"requests"`
@@ -240,7 +240,7 @@ func TestSimulateThreshold(t *testing.T) {
 		Total      int `json:"total"`
 		WouldBlock int `json:"would_block"`
 	}
-	c.decode(c.get("/api/simulate?threshold=5&from=2026-04-01T00:00:00Z&to=2026-04-02T00:00:00Z"),
+	c.decode(c.get("/api/simulate?threshold=5&"+seedRange()),
 		http.StatusOK, &sim)
 	if sim.Total != 3 || sim.WouldBlock != 1 {
 		t.Errorf("total=%d blocked=%d, want 3 and 1", sim.Total, sim.WouldBlock)
@@ -267,7 +267,7 @@ func TestIPProfile(t *testing.T) {
 			Requests int `json:"requests"`
 		} `json:"stat"`
 	}
-	c.decode(c.get("/api/ip/203.0.113.9?from=2026-04-01T00:00:00Z&to=2026-04-02T00:00:00Z"),
+	c.decode(c.get("/api/ip/203.0.113.9?"+seedRange()),
 		http.StatusOK, &profile)
 	if profile.Stat.Requests != 1 {
 		t.Errorf("requests = %d, want 1", profile.Stat.Requests)

@@ -17,8 +17,8 @@ test: ## Run the unit tests that need no databases
 # ClickHouse, and each resets its own tables. Running them in parallel would
 # have them truncate each other's fixtures.
 test-all: ## Run every test, including those needing Postgres and ClickHouse
-	POSTGRES_TEST_DSN=$${POSTGRES_TEST_DSN:-postgres://postgres:test@127.0.0.1:55432/proxywaf?sslmode=disable} \
-	CLICKHOUSE_TEST_DSN=$${CLICKHOUSE_TEST_DSN:-clickhouse://default:test@127.0.0.1:59000/proxywaf} \
+	POSTGRES_TEST_DSN=$${POSTGRES_TEST_DSN:-postgres://postgres:test@127.0.0.1:55432/heron?sslmode=disable} \
+	CLICKHOUSE_TEST_DSN=$${CLICKHOUSE_TEST_DSN:-clickhouse://default:test@127.0.0.1:59000/heron} \
 	$(GO) test -p 1 -timeout 20m ./... ./test/...
 
 fmt: ## Format the Go sources

@@ -16,7 +16,10 @@ import (
 )
 
 var (
-	baseTime = time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
+	// Recent on purpose: the traffic table's TTL is ts + retention_days, so
+	// fixtures pinned to a calendar date expire once that date is far enough
+	// behind and a background merge removes them.
+	baseTime = time.Now().UTC().Add(-2 * time.Hour).Truncate(time.Minute)
 
 	// Each run owns its app identifiers, so nothing has to be truncated:
 	// TRUNCATE is deferred on the Atomic engine and can wipe a fresh insert.

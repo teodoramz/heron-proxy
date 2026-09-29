@@ -25,7 +25,17 @@ import (
 	"github.com/amzteodor/heron/internal/store"
 )
 
-var seedTime = time.Date(2026, 4, 1, 9, 0, 0, 0, time.UTC)
+// seedTime is recent on purpose. The traffic table's TTL is
+// ts + retention_days, so fixtures pinned to a calendar date expire once that
+// date is far enough behind, and a background merge quietly removes them.
+var seedTime = time.Now().UTC().Add(-2 * time.Hour).Truncate(time.Minute)
+
+// seedRange is the window the fixtures fall in, as the API takes it.
+func seedRange() string {
+	return fmt.Sprintf("from=%s&to=%s",
+		seedTime.Add(-time.Hour).Format(time.RFC3339),
+		seedTime.Add(time.Hour).Format(time.RFC3339))
+}
 
 type harness struct {
 	server *httptest.Server
