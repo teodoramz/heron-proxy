@@ -87,8 +87,15 @@ export function FilterBar({
     return { common, rest }
   }, [schema])
 
+  const join: 'and' | 'or' = filter.root.op === 'or' ? 'or' : 'and'
+
   function apply(next: Partial<Group>) {
-    onChange({ ...filter, cursor: undefined, root: { ...filter.root, op: 'and', ...next } })
+    onChange({ ...filter, cursor: undefined, root: { ...filter.root, op: join, ...next } })
+  }
+
+  /** setJoin switches between requiring every condition and any one of them. */
+  function setJoin(op: 'and' | 'or') {
+    onChange({ ...filter, cursor: undefined, root: { ...filter.root, op } })
   }
 
   function runSearch(e: React.FormEvent) {
@@ -129,7 +136,7 @@ export function FilterBar({
       setProblem('Enter a value to compare against.')
       return
     }
-    const parsed = coerce(value, current?.kind)
+    const parsed = coerce(value, current?.kind, op)
     if (parsed === INVALID) {
       setProblem(problemFor(current?.kind, value))
       return
@@ -384,9 +391,31 @@ export function FilterBar({
             </span>
           ))}
           {activeCount > 1 && (
-            <button className="btn btn-sm" onClick={clearAll}>
-              Clear all
-            </button>
+            <>
+              <span className="chip-join" role="group" aria-label="How the conditions combine">
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  aria-pressed={join === 'and'}
+                  title="A request has to match every condition"
+                  onClick={() => setJoin('and')}
+                >
+                  match all
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  aria-pressed={join === 'or'}
+                  title="A request matching any one condition is enough"
+                  onClick={() => setJoin('or')}
+                >
+                  match any
+                </button>
+              </span>
+              <button className="btn btn-sm" onClick={clearAll}>
+                Clear all
+              </button>
+            </>
           )}
           <span className="spacer" />
           {lastLoaded && (
@@ -413,8 +442,12 @@ function HelpPanel({ onClose }: { onClose: () => void }) {
 
       <div className="help-body">
         <p className="hint" style={{ marginTop: 0 }}>
-          A filter is one or more conditions, all of which must hold. Pick what to look at, how to
-          compare it, and the value. The buttons above are shortcuts for the common ones.
+          A filter is one or more conditions. Pick what to look at, how to compare it, and the
+          value. With more than one, <strong>match all</strong> requires every condition and{' '}
+          <strong>match any</strong> accepts a request that meets just one. Choosing{' '}
+          <strong>is one of</strong> lets a single condition take several values, and{' '}
+          <strong>matches regex</strong> takes a pattern. The buttons above are shortcuts for the
+          common ones.
         </p>
 
         <h4>Questions people ask</h4>
@@ -467,25 +500,41 @@ function ValueInput({
   onChange: (v: string) => void
   attackTypes: string[]
 }) {
-  if (field === 'rule_tag' && attackTypes.length > 0) {
+  // Before any of the per-field pickers: choosing "matches regex" has to give a
+  // box you can type a pattern into, whatever the field normally offers.
+  if (op === 'regex') {
     return (
-      <select className="select" style={{ width: 200 }} value={value} onChange={(e) => onChange(e.target.value)} aria-label="Attack type">
-        <option value="">Choose one</option>
-        {attackTypes.map((t) => (
-          <option key={t} value={t}>
-            {t.replace('attack-', '')}
-          </option>
-        ))}
-      </select>
+      <input
+        className="input mono"
+        style={{ width: 260 }}
+        placeholder="^/api/v\\d+/"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        aria-label="Regular expression"
+        spellCheck={false}
+      />
     )
   }
-  if (field === 'method') {
+
+  const choices = field === 'method' ? METHODS : field === 'rule_tag' ? attackTypes : null
+  if (choices && choices.length > 0) {
+    const label = (c: string) => (field === 'rule_tag' ? c.replace('attack-', '') : c)
+    // "is one of" takes several at once; the rest take exactly one.
+    if (op === 'in') {
+      return <PickMany choices={choices} label={label} value={value} onChange={onChange} />
+    }
     return (
-      <select className="select" style={{ width: 140 }} value={value} onChange={(e) => onChange(e.target.value)} aria-label="Method">
+      <select
+        className="select"
+        style={{ width: field === 'method' ? 140 : 200 }}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        aria-label={field === 'method' ? 'Method' : 'Attack type'}
+      >
         <option value="">Choose one</option>
-        {['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'].map((m) => (
-          <option key={m} value={m}>
-            {m}
+        {choices.map((c) => (
+          <option key={c} value={c}>
+            {label(c)}
           </option>
         ))}
       </select>
@@ -513,19 +562,6 @@ function ValueInput({
       />
     )
   }
-  if (op === 'regex') {
-    return (
-      <input
-        className="input mono"
-        style={{ width: 260 }}
-        placeholder="^/api/v\\d+/"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        aria-label="Regular expression"
-        spellCheck={false}
-      />
-    )
-  }
   if (kind === 'datetime') {
     return (
       <input
@@ -542,7 +578,13 @@ function ValueInput({
     <input
       className="input"
       style={{ width: 230 }}
-      placeholder={kind === 'ip' ? '203.0.113.9 or 203.0.113.0/24' : 'value'}
+      placeholder={
+        op === 'in'
+          ? 'several, separated by commas'
+          : kind === 'ip'
+            ? '203.0.113.9 or 203.0.113.0/24'
+            : 'value'
+      }
       value={value}
       onChange={(e) => onChange(e.target.value)}
       aria-label="Value"
@@ -553,8 +595,21 @@ function ValueInput({
 /** INVALID marks a value the field cannot accept, so the form can say why. */
 const INVALID = Symbol('invalid')
 
-function coerce(raw: string, kind?: string): unknown {
+function coerce(raw: string, kind?: string, op?: Op): unknown {
   const text = raw.trim()
+  // "is one of" is a list, however it was typed or ticked.
+  if (op === 'in') {
+    const parts = text
+      .split(',')
+      .map((v) => v.trim())
+      .filter(Boolean)
+    if (parts.length === 0) return INVALID
+    if (kind === 'number' || kind === 'number_array') {
+      const nums = parts.map(Number)
+      return nums.every(Number.isFinite) ? nums : INVALID
+    }
+    return parts
+  }
   switch (kind) {
     case 'number':
     case 'number_array': {
@@ -586,4 +641,45 @@ function problemFor(kind: string | undefined, value: string): string {
     default:
       return `“${value}” cannot be used here.`
   }
+}
+
+const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']
+
+/** PickMany ticks off several values for an "is one of" condition. */
+function PickMany({
+  choices,
+  label,
+  value,
+  onChange,
+}: {
+  choices: string[]
+  label: (c: string) => string
+  value: string
+  onChange: (v: string) => void
+}) {
+  const chosen = value
+    .split(',')
+    .map((v) => v.trim())
+    .filter(Boolean)
+
+  function toggle(c: string) {
+    const next = chosen.includes(c) ? chosen.filter((v) => v !== c) : [...chosen, c]
+    onChange(next.join(', '))
+  }
+
+  return (
+    <div className="pick-many" role="group" aria-label="Choose one or more">
+      {choices.map((c) => (
+        <button
+          key={c}
+          type="button"
+          className="btn btn-sm"
+          aria-pressed={chosen.includes(c)}
+          onClick={() => toggle(c)}
+        >
+          {label(c)}
+        </button>
+      ))}
+    </div>
+  )
 }
