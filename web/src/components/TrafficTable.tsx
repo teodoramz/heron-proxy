@@ -1,11 +1,27 @@
-import { useCallback, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { TrafficEvent } from '../api/types'
-import { COLUMNS_BY_ID, sortFieldFor, trackFor, type ColumnDef, type WidthMode } from './columns'
+import {
+  COLUMNS_BY_ID,
+  measureTracks,
+  sortFieldFor,
+  trackFor,
+  type ColumnDef,
+  type WidthMode,
+} from './columns'
 import { anomalyLevel } from './format'
 
 const ROW_HEIGHT = 30
 const OVERSCAN = 12
 const MIN_WIDTH = 48
+
+/** tableFonts reads the header and cell fonts the stylesheet is using, so the
+ *  measurement matches what actually gets drawn. */
+function tableFonts() {
+  const root = getComputedStyle(document.documentElement)
+  const ui = root.getPropertyValue('--font-ui').trim() || 'sans-serif'
+  const data = root.getPropertyValue('--font-data').trim() || 'monospace'
+  return { head: `600 11px ${ui}`, body: `12px ${data}` }
+}
 
 interface Props {
   events: TrafficEvent[]
@@ -45,8 +61,21 @@ export function TrafficTable({
   const [range, setRange] = useState({ start: 0, end: 60 })
 
   const defs = columns.map((id) => COLUMNS_BY_ID.get(id)).filter(Boolean) as ColumnDef[]
+
+  // Full mode sizes every column to the widest value on the page. It has to be
+  // measured rather than left to `max-content`: each row is its own grid, so
+  // the browser would size the same column differently in every one of them.
+  const measured = useMemo(
+    () =>
+      widthMode === 'full'
+        ? measureTracks(defs, events, (c, e) => c.value(e), tableFonts())
+        : {},
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [widthMode, events, columns.join(',')],
+  )
+
   // The leading 4px track is the anomaly gutter.
-  const template = `4px ${defs.map((c) => trackFor(c, widths, widthMode)).join(' ')}`
+  const template = `4px ${defs.map((c) => trackFor(c, widths, widthMode, measured)).join(' ')}`
 
   // Panning is on the middle button only. The left button has to stay free for
   // selecting text inside a cell, which is the whole point of showing it.

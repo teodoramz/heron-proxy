@@ -160,24 +160,71 @@ export function saveWidths(widths: Record<string, number>): void {
 /** How the table sizes its columns. */
 export type WidthMode = 'fit' | 'full'
 
+/** minWidth is the narrowest a column may be, taken from its declared track. */
+function minWidth(c: ColumnDef): number {
+  const m = c.width.match(/minmax\((\d+)px/)?.[1] ?? c.width.match(/^(\d+)px$/)?.[1]
+  return m ? Number(m) : 80
+}
+
+/** Widest a measured column may become before it starts clipping again. */
+const MAX_MEASURED = 560
+/** Horizontal padding on a cell, from the stylesheet. */
+const CELL_PADDING = 20
+
 /**
  * trackFor returns the grid track for a column.
  *
- * A width the person dragged always wins. Otherwise "fit" shares the window
- * between the flexible columns, and "full" lets each column take the width its
- * content needs, so the table becomes wider than the window and scrolls.
+ * A width the person dragged always wins; otherwise "fit" shares the window
+ * between the flexible columns. Full mode uses a measured pixel width, which
+ * measureTracks supplies — `max-content` cannot be used here, because every row
+ * is its own grid container and would resolve it against its own text, leaving
+ * the columns out of line with each other and with the header.
  */
-export function trackFor(c: ColumnDef, widths: Record<string, number>, mode: WidthMode): string {
+export function trackFor(
+  c: ColumnDef,
+  widths: Record<string, number>,
+  mode: WidthMode,
+  measured?: Record<string, number>,
+): string {
   const w = widths[c.id]
   if (w) return `${w}px`
   if (mode === 'fit') return c.width
+  return `${measured?.[c.id] ?? minWidth(c)}px`
+}
 
-  // Full mode sizes every column to its content, not just the flexible ones:
-  // a fixed track such as the timestamp would otherwise keep truncating, which
-  // is the thing full mode exists to prevent. The declared width becomes the
-  // minimum so columns never collapse below a readable size.
-  const min = c.width.match(/minmax\((\d+)px/)?.[1] ?? c.width.match(/^(\d+)px$/)?.[1] ?? '80'
-  return `minmax(${min}px, max-content)`
+let ruler: CanvasRenderingContext2D | null = null
+
+/** textWidth measures a string in the table's own font. */
+function textWidth(text: string, font: string): number {
+  if (!ruler) ruler = document.createElement('canvas').getContext('2d')
+  if (!ruler) return text.length * 7
+  ruler.font = font
+  return ruler.measureText(text).width
+}
+
+/**
+ * measureTracks sizes each column to the widest value on the page, so header
+ * and rows agree on where every column starts.
+ */
+export function measureTracks<T>(
+  defs: ColumnDef[],
+  rows: T[],
+  value: (c: ColumnDef, row: T) => string,
+  fonts: { head: string; body: string },
+): Record<string, number> {
+  const out: Record<string, number> = {}
+  for (const c of defs) {
+    let widest = textWidth(c.label, fonts.head) + 14 // room for the sort arrow
+    for (const row of rows) {
+      const w = textWidth(value(c, row), fonts.body)
+      if (w > widest) widest = w
+    }
+    out[c.id] = Math.min(
+      MAX_MEASURED,
+      Math.max(minWidth(c), Math.ceil(widest) + CELL_PADDING),
+    )
+  }
+  return out
 }
 
 const MODE_KEY = 'pw-width-mode'

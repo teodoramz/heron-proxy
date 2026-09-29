@@ -140,15 +140,15 @@ export function Apps() {
                     <th className="num">Paranoia</th>
                     <th className="num">Threshold</th>
                     <th className="num">Retention</th>
-                    <th />
+                    <th className="actions" />
                   </tr>
                 </thead>
                 <tbody>
                   {apps.map((a) => (
                     <tr key={a.id}>
-                      <td>{a.id}</td>
-                      <td>{a.hostnames.join(', ')}</td>
-                      <td className="muted">{a.upstream_url}</td>
+                      <td title={a.id}>{a.id}</td>
+                      <td className="clip" title={a.hostnames.join(', ')}>{a.hostnames.join(', ')}</td>
+                      <td className="muted clip-wide" title={a.upstream_url}>{a.upstream_url}</td>
                       <td className="muted">{a.http_only ? 'http' : 'http + https'}</td>
                       <td className={a.waf.mode === 'block' ? 'blocked-flag' : 'muted'}>
                         {a.waf.mode === 'block' ? 'enforcing' : 'detect only'}

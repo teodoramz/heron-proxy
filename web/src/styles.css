@@ -537,15 +537,25 @@ pre.code {
 }
 
 .panel-head h2 { margin: 0; font-size: 13px; font-weight: 600; }
-.panel-body { padding: 12px; }
+.panel-body { padding: 12px; overflow-x: auto; }
 
 .two-col { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; }
 
-table.data { width: 100%; border-collapse: collapse; font-size: 12px; }
-table.data th { text-align: left; color: var(--text-dim); font-weight: 600; padding: 4px 8px; border-bottom: 1px solid var(--line); font-size: 11px; }
+/* A grid item's min-width is auto, so a panel holding a long URL refuses to
+   shrink and pushes the whole row off the screen. */
+.two-col > *, .panel { min-width: 0; }
+
+table.data { width: 100%; min-width: 480px; border-collapse: collapse; font-size: 12px; }
+table.data th { text-align: left; color: var(--text-dim); font-weight: 600; padding: 4px 8px; border-bottom: 1px solid var(--line); font-size: 11px; white-space: nowrap; }
 table.data td { padding: 4px 8px; border-bottom: 1px solid var(--line); font-family: var(--font-data); }
 table.data tr:last-child td { border-bottom: 0; }
-table.data td.num { text-align: right; }
+table.data td.num, table.data th.num { text-align: right; white-space: nowrap; }
+table.data th.actions, table.data td.actions { width: 1%; white-space: nowrap; }
+
+/* A value with no natural limit — a URL, a rule message — is clipped so it
+   cannot take the whole table over. The full text stays on the title. */
+table.data td.clip { max-width: 22ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+table.data td.clip-wide { max-width: 40ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .bar { height: 4px; background: var(--accent-dim); border-radius: 2px; }
 
@@ -780,3 +790,9 @@ table.data td.num { text-align: right; }
 .help-body { padding: 10px 12px 14px; }
 .help-body h4 { margin: 14px 0 6px; font-size: 12px; color: var(--text-dim); font-weight: 600; }
 .help-body table.data td { padding: 3px 8px; }
+
+/* Several values for one "is one of" condition. */
+.pick-many { display: flex; flex-wrap: wrap; gap: 4px; max-width: 420px; }
+
+/* The all/any switch sits with the condition chips. */
+.chip-join { display: inline-flex; gap: 2px; }

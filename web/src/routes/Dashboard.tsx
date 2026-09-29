@@ -106,6 +106,7 @@ export function Dashboard() {
                 head={['Rule', 'Message', 'Hits']}
                 rows={rules.map((r) => [String(r.rule_id), r.message ?? '', count(r.hits)])}
                 empty="No rules fired in this window."
+                numeric={[2]}
               />
             </div>
           </section>
@@ -120,6 +121,7 @@ export function Dashboard() {
                 rows={ips.map((i) => [i.client_ip, count(i.requests), count(i.anomaly)])}
                 empty="No traffic in this window."
                 link={(row) => `/ip/${encodeURIComponent(row[0])}`}
+                numeric={[1, 2]}
               />
             </div>
           </section>
@@ -133,6 +135,7 @@ export function Dashboard() {
                 head={['Path', 'Requests', 'Errors']}
                 rows={paths.map((p) => [p.key, count(p.requests), count(p.errors)])}
                 empty="No traffic in this window."
+                numeric={[1, 2]}
               />
             </div>
           </section>
@@ -152,24 +155,32 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: 'bl
   )
 }
 
+/**
+ * RankTable renders a ranked list. Columns named in numeric are right-aligned
+ * and kept narrow; everything else is text and takes the space left over —
+ * without that, a long rule message is right-aligned against a ragged edge.
+ */
 function RankTable({
   head,
   rows,
   empty,
   link,
+  numeric,
 }: {
   head: string[]
   rows: string[][]
   empty: string
   link?: (row: string[]) => string
+  numeric: number[]
 }) {
   if (rows.length === 0) return <p className="muted">{empty}</p>
+  const isNum = (i: number) => numeric.includes(i)
   return (
     <table className="data">
       <thead>
         <tr>
           {head.map((h, i) => (
-            <th key={h} className={i > 0 ? 'num' : ''}>
+            <th key={h} className={isNum(i) ? 'num' : ''}>
               {h}
             </th>
           ))}
@@ -179,7 +190,7 @@ function RankTable({
         {rows.map((row, i) => (
           <tr key={i}>
             {row.map((cell, j) => (
-              <td key={j} className={j > 0 ? 'num' : ''}>
+              <td key={j} className={isNum(j) ? 'num' : 'clip-wide'} title={cell}>
                 {j === 0 && link ? <a href={link(row)}>{cell}</a> : cell}
               </td>
             ))}
