@@ -82,6 +82,12 @@ func (c *Conn) peekLocked() {
 	if err != nil {
 		return
 	}
+	// Only wait for the rest of a record that is actually a TLS handshake.
+	// Anything else is replayed as it arrived, which is what lets the same
+	// listener serve plain HTTP.
+	if !ja3.IsHandshakeRecord(hdr) {
+		return
+	}
 	total := ja3.RecordLength(hdr)
 	if total <= 5 || total > maxHelloRecord {
 		return

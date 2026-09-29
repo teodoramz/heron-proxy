@@ -332,6 +332,32 @@ func TestCertStoreFallsBackToTheAuthority(t *testing.T) {
 	}
 }
 
+// TestPlainHTTPIsNotWaitedOn is the HTTP half of the shared listener: a request
+// that is not TLS must be handed straight to the server. Read the first five
+// bytes of "GET /" as a record header and they claim 8241 bytes, so peeking
+// blocked until the client gave up.
+func TestPlainHTTPIsNotWaitedOn(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusTeapot)
+	})}
+	go srv.Serve(NewListener(ln))
+	t.Cleanup(func() { srv.Close() })
+
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Get("http://" + ln.Addr().String() + "/")
+	if err != nil {
+		t.Fatalf("plain HTTP through the peeking listener: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusTeapot {
+		t.Errorf("status = %d, want 418", resp.StatusCode)
+	}
+}
+
 func TestPlainHostsAreNeverMintedFor(t *testing.T) {
 	s := NewCertStore()
 	ca, _ := NewCA("heron test authority")

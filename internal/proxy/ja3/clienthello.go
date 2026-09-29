@@ -42,6 +42,13 @@ func IsGREASE(v uint16) bool {
 	return v&0x0f0f == 0x0a0a && byte(v>>8) == byte(v)
 }
 
+// IsHandshakeRecord reports whether b begins a TLS handshake record. Without
+// this check a plain HTTP request is read as one: "GET /" yields a length of
+// 8241, and the caller then waits for bytes that are never coming.
+func IsHandshakeRecord(b []byte) bool {
+	return len(b) >= 5 && b[0] == recordHandshake && b[1] == 0x03
+}
+
 // RecordLength returns the total byte length of the TLS record starting at b,
 // or 0 if b does not yet hold a complete record header.
 func RecordLength(b []byte) int {
