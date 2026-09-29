@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"text/template"
 	"time"
 
 	"github.com/amzteodor/heron/internal/pipeline/event"
@@ -230,12 +231,54 @@ func buildPayload(rule store.AlertRule, ev event.Event) ([]byte, error) {
 		Status: ev.Status, Anomaly: ev.AnomalyScore, WouldBlock: ev.WouldBlock,
 		RuleIDs: ev.RuleIDs, RuleTags: ev.RuleTags,
 	}
+
+	text := summarize(p)
+	if rule.Template != "" {
+		rendered, err := render(rule.Template, p)
+		if err != nil {
+			return nil, err
+		}
+		text = rendered
+	}
+
 	switch rule.Channel {
-	case "slack", "discord":
-		return json.Marshal(map[string]string{"text": summarize(p), "content": summarize(p)})
+	// Mattermost and Slack both read "text"; Discord reads "content".
+	case "slack", "mattermost":
+		return json.Marshal(map[string]string{"text": text})
+	case "discord":
+		return json.Marshal(map[string]string{"content": text})
 	default:
+		// A template on a plain webhook is the whole body, so any shape the
+		// receiver wants can be written out directly.
+		if rule.Template != "" {
+			return []byte(text), nil
+		}
 		return json.Marshal(p)
 	}
+}
+
+// render fills a rule's template from the event. Fields are named as in
+// Payload, for example {{.Method}} {{.Host}}{{.Path}} from {{.ClientIP}}.
+func render(tmpl string, p Payload) (string, error) {
+	t, err := template.New("alert").Option("missingkey=error").Parse(tmpl)
+	if err != nil {
+		return "", fmt.Errorf("alerts: template: %w", err)
+	}
+	var b strings.Builder
+	if err := t.Execute(&b, p); err != nil {
+		return "", fmt.Errorf("alerts: template: %w", err)
+	}
+	return b.String(), nil
+}
+
+// ValidTemplate reports whether a template parses and runs, so a rule can be
+// rejected when it is saved rather than when it first fires.
+func ValidTemplate(tmpl string) error {
+	if tmpl == "" {
+		return nil
+	}
+	_, err := render(tmpl, Payload{TS: time.Now()})
+	return err
 }
 
 func summarize(p Payload) string {

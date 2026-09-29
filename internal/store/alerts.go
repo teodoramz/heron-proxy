@@ -19,16 +19,19 @@ type AlertCondition struct {
 
 // AlertRule delivers a notification when its condition matches an event.
 type AlertRule struct {
-	ID              string         `json:"id"`
-	Name            string         `json:"name"`
-	AppID           string         `json:"app_id"`
-	Condition       AlertCondition `json:"condition"`
-	Channel         string         `json:"channel"`
-	TargetURL       string         `json:"target_url"`
-	ThrottleSeconds int            `json:"throttle_seconds"`
-	Enabled         bool           `json:"enabled"`
-	LastFiredAt     *time.Time     `json:"last_fired_at,omitempty"`
-	CreatedAt       time.Time      `json:"created_at"`
+	ID        string         `json:"id"`
+	Name      string         `json:"name"`
+	AppID     string         `json:"app_id"`
+	Condition AlertCondition `json:"condition"`
+	Channel   string         `json:"channel"`
+	TargetURL string         `json:"target_url"`
+	// Template is the message body, rendered per event. Empty means the
+	// channel's built-in wording.
+	Template        string     `json:"template"`
+	ThrottleSeconds int        `json:"throttle_seconds"`
+	Enabled         bool       `json:"enabled"`
+	LastFiredAt     *time.Time `json:"last_fired_at,omitempty"`
+	CreatedAt       time.Time  `json:"created_at"`
 }
 
 // SaveAlertRule inserts or updates an alert rule.
@@ -39,15 +42,15 @@ func (s *Store) SaveAlertRule(ctx context.Context, r AlertRule) (AlertRule, erro
 	}
 	if r.ID == "" {
 		err = s.pool.QueryRow(ctx, `
-			INSERT INTO alert_rules (name, app_id, condition, channel, target_url, throttle_seconds, enabled)
-			VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id, created_at`,
-			r.Name, nullable(r.AppID), cond, r.Channel, r.TargetURL, r.ThrottleSeconds, r.Enabled).
+			INSERT INTO alert_rules (name, app_id, condition, channel, target_url, throttle_seconds, enabled, template)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id, created_at`,
+			r.Name, nullable(r.AppID), cond, r.Channel, r.TargetURL, r.ThrottleSeconds, r.Enabled, r.Template).
 			Scan(&r.ID, &r.CreatedAt)
 	} else {
 		_, err = s.pool.Exec(ctx, `
 			UPDATE alert_rules SET name=$2, app_id=$3, condition=$4, channel=$5,
-				target_url=$6, throttle_seconds=$7, enabled=$8 WHERE id=$1`,
-			r.ID, r.Name, nullable(r.AppID), cond, r.Channel, r.TargetURL, r.ThrottleSeconds, r.Enabled)
+				target_url=$6, throttle_seconds=$7, enabled=$8, template=$9 WHERE id=$1`,
+			r.ID, r.Name, nullable(r.AppID), cond, r.Channel, r.TargetURL, r.ThrottleSeconds, r.Enabled, r.Template)
 	}
 	if err != nil {
 		return AlertRule{}, fmt.Errorf("store: save alert rule: %w", err)
@@ -59,7 +62,7 @@ func (s *Store) SaveAlertRule(ctx context.Context, r AlertRule) (AlertRule, erro
 func (s *Store) ListAlertRules(ctx context.Context) ([]AlertRule, error) {
 	rows, err := s.pool.Query(ctx, `
 		SELECT id, name, COALESCE(app_id,''), condition, channel, target_url,
-		       throttle_seconds, enabled, last_fired_at, created_at
+		       throttle_seconds, enabled, template, last_fired_at, created_at
 		FROM alert_rules ORDER BY name`)
 	if err != nil {
 		return nil, fmt.Errorf("store: list alert rules: %w", err)
@@ -71,7 +74,7 @@ func (s *Store) ListAlertRules(ctx context.Context) ([]AlertRule, error) {
 		var r AlertRule
 		var cond []byte
 		if err := rows.Scan(&r.ID, &r.Name, &r.AppID, &cond, &r.Channel, &r.TargetURL,
-			&r.ThrottleSeconds, &r.Enabled, &r.LastFiredAt, &r.CreatedAt); err != nil {
+			&r.ThrottleSeconds, &r.Enabled, &r.Template, &r.LastFiredAt, &r.CreatedAt); err != nil {
 			return nil, err
 		}
 		_ = json.Unmarshal(cond, &r.Condition)

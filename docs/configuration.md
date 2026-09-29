@@ -51,6 +51,13 @@ Postgres and is edited in the UI.
 | `SESSION_KEY` | random | Signs session cookies. Unset means everyone is signed out on restart. |
 | `ADMIN_USERNAME`, `ADMIN_PASSWORD` | — | Creates the first administrator, on first start only. A username is 2–40 characters of letters, digits, dots, dashes or underscores. |
 
+### Alerts
+
+| Field | Purpose |
+| --- | --- |
+| `channel` | `webhook`, `slack`, `mattermost` or `discord`. Slack and Mattermost read `text`; Discord reads `content`. |
+| `template` | Optional message body, rendered per event with Go template syntax: `{{.Method}} {{.Host}}{{.Path}} from {{.ClientIP}}`. Empty means the default wording. On a plain webhook the rendered text is the entire request body, so any JSON the receiver expects can be written out. Fields are those of the alert payload: `Alert`, `AppID`, `EventID`, `TS`, `ClientIP`, `Method`, `Host`, `Path`, `Status`, `Anomaly`, `WouldBlock`, `RuleIDs`, `RuleTags`. |
+
 ## Per-application policy
 
 Set in the UI, stored in Postgres, applied by the proxy on its next poll.

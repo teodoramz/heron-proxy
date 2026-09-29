@@ -235,8 +235,9 @@ function NewUser({ apps, onSaved }: { apps: App[]; onSaved: () => void }) {
 function NewAlert({ apps, onSaved }: { apps: App[]; onSaved: () => void }) {
   const [name, setName] = useState('')
   const [appId, setAppId] = useState('')
-  const [channel, setChannel] = useState<'webhook' | 'slack' | 'discord'>('webhook')
+  const [channel, setChannel] = useState<AlertRule['channel']>('webhook')
   const [url, setUrl] = useState('')
+  const [template, setTemplate] = useState('')
   const [minAnomaly, setMinAnomaly] = useState(5)
   const [error, setError] = useState('')
 
@@ -249,12 +250,14 @@ function NewAlert({ apps, onSaved }: { apps: App[]; onSaved: () => void }) {
         app_id: appId,
         channel,
         target_url: url,
+        template,
         throttle_seconds: 300,
         enabled: true,
         condition: { min_anomaly: minAnomaly },
       })
       setName('')
       setUrl('')
+      setTemplate('')
       onSaved()
     } catch (err) {
       setError((err as Error).message)
@@ -291,6 +294,7 @@ function NewAlert({ apps, onSaved }: { apps: App[]; onSaved: () => void }) {
           >
             <option value="webhook">webhook</option>
             <option value="slack">slack</option>
+            <option value="mattermost">mattermost</option>
             <option value="discord">discord</option>
           </select>
         </div>
@@ -312,6 +316,28 @@ function NewAlert({ apps, onSaved }: { apps: App[]; onSaved: () => void }) {
         <button className="btn btn-primary" type="submit">
           Add alert
         </button>
+      </div>
+
+      <div className="field" style={{ marginTop: 10, maxWidth: 620 }}>
+        <label htmlFor="alert-template">Message (optional)</label>
+        <textarea
+          id="alert-template"
+          className="textarea"
+          rows={3}
+          placeholder={'{{.Method}} {{.Host}}{{.Path}} from {{.ClientIP}} scored {{.Anomaly}}'}
+          value={template}
+          onChange={(e) => setTemplate(e.target.value)}
+          spellCheck={false}
+        />
+        <span className="hint">
+          Leave empty for the default wording. Fields: <code>{'{{.Alert}}'}</code>{' '}
+          <code>{'{{.AppID}}'}</code> <code>{'{{.EventID}}'}</code> <code>{'{{.ClientIP}}'}</code>{' '}
+          <code>{'{{.Method}}'}</code> <code>{'{{.Host}}'}</code> <code>{'{{.Path}}'}</code>{' '}
+          <code>{'{{.Status}}'}</code> <code>{'{{.Anomaly}}'}</code>{' '}
+          <code>{'{{.WouldBlock}}'}</code> <code>{'{{.RuleIDs}}'}</code>. On slack, mattermost and
+          discord this becomes the message text; on a plain webhook it is the whole request body,
+          so you can write any JSON the receiver expects.
+        </span>
       </div>
     </form>
   )

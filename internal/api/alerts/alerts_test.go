@@ -251,30 +251,91 @@ func TestEngineThrottles(t *testing.T) {
 	}
 }
 
-func TestSlackPayloadShape(t *testing.T) {
+// deliver runs one event through a rule and returns the body the receiver saw.
+func deliver(t *testing.T, rule store.AlertRule) string {
+	t.Helper()
 	rec := newRecorder(t)
-	rules := &fakeRules{rules: []store.AlertRule{{
-		ID: "r1", Name: "sqli", Channel: "slack", TargetURL: rec.server.URL,
-		Enabled: true, ThrottleSeconds: 1,
-	}}}
+	rule.ID, rule.Enabled, rule.ThrottleSeconds, rule.TargetURL = "r1", true, 1, rec.server.URL
 	src := &fakeSource{ch: make(chan event.Event, 4)}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	go New(src, rules, nil).Run(ctx)
+	go New(src, &fakeRules{rules: []store.AlertRule{rule}}, nil).Run(ctx)
 
 	src.ch <- testEvent()
 	waitFor(t, func() bool { return rec.count() == 1 })
+	return rec.first()
+}
 
+// Each chat service reads a different field, so sending both was only ever
+// working by accident.
+func TestChatPayloadShape(t *testing.T) {
+	for _, tc := range []struct{ channel, field string }{
+		{"slack", "text"},
+		{"mattermost", "text"},
+		{"discord", "content"},
+	} {
+		t.Run(tc.channel, func(t *testing.T) {
+			var body map[string]string
+			if err := json.Unmarshal([]byte(deliver(t, store.AlertRule{Name: "sqli", Channel: tc.channel})), &body); err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(body[tc.field], "/v1/login") {
+				t.Errorf("%s = %q", tc.field, body[tc.field])
+			}
+			if len(body) != 1 {
+				t.Errorf("payload carries %d fields, want only %q", len(body), tc.field)
+			}
+		})
+	}
+}
+
+func TestTemplateReplacesTheMessage(t *testing.T) {
 	var body map[string]string
-	if err := json.Unmarshal([]byte(rec.first()), &body); err != nil {
+	raw := deliver(t, store.AlertRule{
+		Name: "sqli", Channel: "mattermost",
+		Template: "{{.Method}} {{.Host}}{{.Path}} scored {{.Anomaly}}",
+	})
+	if err := json.Unmarshal([]byte(raw), &body); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(body["text"], "/v1/login") {
-		t.Errorf("slack text = %q", body["text"])
+	if !strings.Contains(body["text"], "/v1/login scored 15") {
+		t.Errorf("text = %q", body["text"])
 	}
-	if body["content"] == "" {
-		t.Error("discord content field missing")
+	if strings.Contains(body["text"], "[sqli]") {
+		t.Error("the default wording was used instead of the template")
+	}
+}
+
+// On a plain webhook the template is the whole body, so any shape can be sent.
+func TestTemplateOnAWebhookIsTheWholeBody(t *testing.T) {
+	raw := deliver(t, store.AlertRule{
+		Name: "sqli", Channel: "webhook",
+		Template: `{"attachment": {"title": "{{.Alert}}", "ip": "{{.ClientIP}}"}}`,
+	})
+	var body struct {
+		Attachment struct{ Title, IP string } `json:"attachment"`
+	}
+	if err := json.Unmarshal([]byte(raw), &body); err != nil {
+		t.Fatalf("not the JSON the template wrote: %v (%s)", err, raw)
+	}
+	if body.Attachment.Title != "sqli" {
+		t.Errorf("title = %q", body.Attachment.Title)
+	}
+}
+
+func TestValidTemplateRejectsRubbish(t *testing.T) {
+	if err := ValidTemplate(""); err != nil {
+		t.Errorf("an empty template is allowed: %v", err)
+	}
+	if err := ValidTemplate("{{.Method}}"); err != nil {
+		t.Errorf("a good template was rejected: %v", err)
+	}
+	if err := ValidTemplate("{{.Nope}}"); err == nil {
+		t.Error("an unknown field was accepted")
+	}
+	if err := ValidTemplate("{{.Method"); err == nil {
+		t.Error("an unclosed action was accepted")
 	}
 }
 

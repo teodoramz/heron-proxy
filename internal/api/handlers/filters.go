@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/amzteodor/heron/internal/api/alerts"
 	"github.com/amzteodor/heron/internal/api/query"
 	"github.com/amzteodor/heron/internal/store"
 )
@@ -85,6 +86,12 @@ func (h *Handler) SaveAlert(w http.ResponseWriter, r *http.Request) {
 	}
 	if rule.ThrottleSeconds <= 0 {
 		rule.ThrottleSeconds = 300
+	}
+	// A broken template would otherwise only show up the first time the rule
+	// fires, which is the worst moment to find out.
+	if err := alerts.ValidTemplate(rule.Template); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
 	}
 	saved, err := h.Store.SaveAlertRule(r.Context(), rule)
 	if err != nil {

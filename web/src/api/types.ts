@@ -236,7 +236,8 @@ export interface AlertRule {
   id: string
   name: string
   app_id: string
-  channel: 'webhook' | 'slack' | 'discord'
+  channel: 'webhook' | 'slack' | 'mattermost' | 'discord'
+  template?: string
   target_url: string
   throttle_seconds: number
   enabled: boolean
