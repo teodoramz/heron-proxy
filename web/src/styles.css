@@ -796,3 +796,8 @@ table.data td.clip-wide { max-width: 40ch; overflow: hidden; text-overflow: elli
 
 /* The all/any switch sits with the condition chips. */
 .chip-join { display: inline-flex; gap: 2px; }
+
+/* The username in the rail is a link to the account page. */
+.rail-who { color: var(--text); text-decoration: none; }
+.rail-who:hover { color: var(--accent); text-decoration: underline; }
+.ok-msg { color: var(--accent); font-size: 12px; margin: 0 0 10px; }

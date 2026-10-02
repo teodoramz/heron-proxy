@@ -57,6 +57,8 @@ export const api = {
     post<{ user: User; csrf_token: string }>('/api/auth/login', { username, password }),
   logout: () => post<void>('/api/auth/logout'),
   me: () => request<{ user: User; apps: string[] }>('/api/me'),
+  changeOwnPassword: (current: string, next: string) =>
+    post<void>('/api/me/password', { current_password: current, new_password: next }),
 
   searchTraffic: (filter: Filter) => post<Page>('/api/traffic/search', resolveRange(filter)),
   countTraffic: (filter: Filter) =>

@@ -129,6 +129,7 @@ local lab.
 | --- | :--: | :--: |
 | Browse, search and filter traffic | ✓ | ✓ |
 | Request bodies, replay, verdicts, exclusions | ✓ | ✓ |
+| Change their own password | ✓ | ✓ |
 | Applications, certificates, users, alerts | | ✓ |
 
 ## Limitations

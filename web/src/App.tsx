@@ -1,6 +1,7 @@
 import { NavLink, Navigate, Route, Routes } from 'react-router-dom'
 import { useAuth } from './hooks/useAuth'
 import { useTheme } from './hooks/useTheme'
+import { Account } from './routes/Account'
 import { Apps } from './routes/Apps'
 import { Dashboard } from './routes/Dashboard'
 import { IPProfileRoute } from './routes/IPProfile'
@@ -49,7 +50,9 @@ export default function App() {
           )}
         </div>
         <div className="rail-foot">
-          <span className="mono">{user.username}</span>
+          <NavLink className="rail-who mono" to="/account" title="Your account">
+            {user.username}
+          </NavLink>
           <span className="muted">{user.role}</span>
           <div className="row">
             <button className="btn btn-sm" onClick={toggleTheme}>
@@ -67,6 +70,7 @@ export default function App() {
           <Route path="/tuning" element={<Tuning />} />
           <Route path="/rules" element={<Rules />} />
           <Route path="/ip/:ip" element={<IPProfileRoute />} />
+          <Route path="/account" element={<Account />} />
           {atLeast('admin') && <Route path="/apps" element={<Apps />} />}
           {atLeast('admin') && <Route path="/settings" element={<Settings />} />}
           <Route path="*" element={<Navigate to="/" replace />} />

@@ -118,6 +118,51 @@ func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, user)
 }
 
+// ChangeOwnPassword lets the signed-in person change their own password. It
+// needs the current one, so a borrowed session cannot lock the owner out.
+func (h *Handler) ChangeOwnPassword(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		CurrentPassword string `json:"current_password"`
+		NewPassword     string `json:"new_password"`
+	}
+	if err := decodeBody(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if len(req.NewPassword) < 12 {
+		writeError(w, http.StatusBadRequest, "the new password must be at least 12 characters")
+		return
+	}
+	if req.NewPassword == req.CurrentPassword {
+		writeError(w, http.StatusBadRequest, "the new password is the same as the current one")
+		return
+	}
+
+	me := session(r).User
+	user, err := h.Store.GetUser(r.Context(), me.ID)
+	if err != nil {
+		writeError(w, statusFor(err), err.Error())
+		return
+	}
+	ok, err := auth.VerifyPassword(req.CurrentPassword, user.PasswordHash)
+	if err != nil || !ok {
+		writeError(w, http.StatusForbidden, "the current password is not correct")
+		return
+	}
+
+	hash, err := auth.HashPassword(req.NewPassword)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if err := h.Store.SetPassword(r.Context(), user.ID, hash); err != nil {
+		writeError(w, statusFor(err), err.Error())
+		return
+	}
+	h.audit(r, "user.password", map[string]any{"user_id": user.ID, "username": user.Username})
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // UpdateUser changes a role, enabled state, password or app scope.
 func (h *Handler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")

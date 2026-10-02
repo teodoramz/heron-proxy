@@ -46,6 +46,7 @@ func NewRouter(o Options) http.Handler {
 	// Session.
 	mux.Handle("POST /api/auth/logout", analyst(http.HandlerFunc(h.Logout)))
 	mux.Handle("GET /api/me", analyst(http.HandlerFunc(h.Me)))
+	mux.Handle("POST /api/me/password", analyst(http.HandlerFunc(h.ChangeOwnPassword)))
 
 	// Traffic.
 	mux.Handle("GET /api/traffic", analyst(http.HandlerFunc(h.ListTraffic)))
