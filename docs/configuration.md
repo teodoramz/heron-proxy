@@ -73,7 +73,8 @@ Set in the UI, stored in Postgres, applied by the proxy on its next poll.
 | `upstream_tls_verify` | Verify the upstream certificate. Off for self-signed internal services. The scheme of `upstream_url` decides whether TLS is used at all. |
 | `preserve_host` | Send the client's `Host` upstream instead of the upstream's own. |
 | `http_only` | Serve over plain HTTP only. No certificate is minted for its hostnames and none is presented, so a client reaching for TLS is refused. An uploaded certificate still wins. |
-| `client_ip_header` | Header carrying the real client address. Default `X-Real-IP`. |
+| `client_ip_header` | Header carrying the real client address. Default `X-Real-IP`. Set last of the forwarding headers, so naming one of them (`X-Forwarded-Host`, say) replaces the proxy's own value rather than being overwritten by it. |
+| `root_redirect` | Absolute path. A request for `/` is answered with a 302 to it instead of being forwarded, for an application that lives under a prefix. The request is still inspected, still counts against the threshold, and is still recorded. |
 | `trusted_cidrs` | Ranges whose `X-Forwarded-For` is believed. Empty means trust none. |
 | `extra_headers` | Headers added to the upstream request, after the forwarding headers, so they win if the names clash. `Host` and the headers that frame the connection are refused. Values are hidden from analysts, since they are usually credentials for the upstream. |
 | `retention_days` | Overrides the 90-day default for this app's events. |

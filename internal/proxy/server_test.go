@@ -791,3 +791,81 @@ func TestExtraHeadersReachTheUpstream(t *testing.T) {
 		t.Error("Host was taken from configuration")
 	}
 }
+
+// An application that lives under a prefix can send "/" there, and the
+// redirect is recorded like any other request rather than vanishing.
+func TestRootRedirect(t *testing.T) {
+	reached := make(chan string, 4)
+	h := newHarness(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		reached <- r.URL.Path
+	}), func(a *config.App) { a.RootRedirect = "/geoserver/web/" })
+
+	// The default client would follow the redirect and report the upstream's
+	// 200, hiding the thing under test.
+	client := h.proxy.Client()
+	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	req, err := http.NewRequest(http.MethodGet, h.proxy.URL+"/", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Host = "app.example"
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("request: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusFound {
+		t.Fatalf("status = %d, want 302", resp.StatusCode)
+	}
+	if got := resp.Header.Get("Location"); got != "/geoserver/web/" {
+		t.Errorf("Location = %q", got)
+	}
+	select {
+	case p := <-reached:
+		t.Errorf("the request was forwarded to %q instead of being answered", p)
+	default:
+	}
+
+	e := h.sink.wait(t)
+	if e.Status != http.StatusFound || e.Path != "/" {
+		t.Errorf("recorded %d for %q, want 302 for /", e.Status, e.Path)
+	}
+}
+
+// Only the root is redirected; everything else is proxied as usual.
+func TestRootRedirectLeavesOtherPathsAlone(t *testing.T) {
+	reached := make(chan string, 4)
+	h := newHarness(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		reached <- r.URL.Path
+	}), func(a *config.App) { a.RootRedirect = "/geoserver/web/" })
+
+	resp := h.get(t, "/geoserver/web/")
+	resp.Body.Close()
+	if resp.StatusCode == http.StatusFound {
+		t.Error("a non-root path was redirected, which would loop")
+	}
+	if got := <-reached; got != "/geoserver/web/" {
+		t.Errorf("upstream saw %q", got)
+	}
+}
+
+// Pointing client_ip_header at one of the forwarding headers has to win; it
+// used to be overwritten by the fixed value set afterwards.
+func TestClientIPHeaderCanTargetAForwardingHeader(t *testing.T) {
+	got := make(chan http.Header, 1)
+	h := newHarness(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got <- r.Header.Clone()
+	}), func(a *config.App) { a.ClientIPHeader = "X-Forwarded-Host" })
+
+	resp := h.get(t, "/")
+	resp.Body.Close()
+	hdr := <-got
+
+	if hdr.Get("X-Forwarded-Host") != "127.0.0.1" {
+		t.Errorf("X-Forwarded-Host = %q, want the client address", hdr.Get("X-Forwarded-Host"))
+	}
+	// The rest are untouched.
+	if hdr.Get("X-Forwarded-Proto") == "" || hdr.Get("X-Request-Id") == "" {
+		t.Error("the other forwarding headers went missing")
+	}
+}

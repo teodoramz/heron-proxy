@@ -103,6 +103,10 @@ type App struct {
 	UpstreamURL       string   `json:"upstream_url"`
 	UpstreamTLSVerify bool     `json:"upstream_tls_verify"`
 	PreserveHost      bool     `json:"preserve_host"`
+	// RootRedirect, when set, answers a request for "/" with a 302 to this
+	// path instead of forwarding it, for an application that lives under a
+	// prefix such as /geoserver/web/.
+	RootRedirect string `json:"root_redirect"`
 	// ExtraHeaders are added to the upstream request, after the forwarding
 	// headers, so an application that needs its own can have them.
 	ExtraHeaders []Header `json:"extra_headers"`

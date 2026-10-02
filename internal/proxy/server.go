@@ -152,6 +152,15 @@ func (s *Server) serveHTTP(w http.ResponseWriter, r *http.Request, app *config.A
 		}
 	}
 
+	// Answered here rather than forwarded, but only after the rules have seen
+	// it: a request for "/" still gets inspected, still counts against the
+	// threshold, and is still recorded.
+	if dest := app.RootRedirect; dest != "" && isRoot(r.URL.Path) {
+		http.Redirect(w, r, dest, http.StatusFound)
+		s.finish(&e, tx, body, http.StatusFound, w.Header(), 0, start, time.Time{})
+		return
+	}
+
 	outReq, err := s.buildUpstreamRequest(r, app, upstreamBody, e)
 	if err != nil {
 		e.Error = err.Error()
@@ -247,11 +256,13 @@ func (s *Server) buildUpstreamRequest(r *http.Request, app *config.App, body io.
 	if header == "" {
 		header = "X-Real-IP"
 	}
-	out.Header.Set(header, e.ClientIP.String())
 	out.Header.Set("X-Forwarded-For", appendForwarded(r.Header.Get("X-Forwarded-For"), e.ClientIP.String()))
 	out.Header.Set("X-Forwarded-Proto", e.Scheme)
 	out.Header.Set("X-Forwarded-Host", r.Host)
 	out.Header.Set("X-Request-Id", e.ID)
+	// Last of the forwarding headers, so pointing client_ip_header at one of
+	// them takes effect instead of being overwritten.
+	out.Header.Set(header, e.ClientIP.String())
 
 	// Last, so an application that needs its own headers can override even the
 	// forwarding ones. Anything that frames the connection is refused when the
@@ -510,3 +521,6 @@ func max64(a, b int64) int64 {
 }
 
 var errHijackUnsupported = errors.New("proxy: connection hijacking not supported")
+
+// isRoot reports whether a path addresses the site root.
+func isRoot(path string) bool { return path == "" || path == "/" }

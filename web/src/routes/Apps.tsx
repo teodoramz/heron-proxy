@@ -9,6 +9,7 @@ const BLANK = {
   upstream_url: '',
   trusted_cidrs: '',
   client_ip_header: 'X-Real-IP',
+  root_redirect: '',
   retention_days: 90,
   preserve_host: false,
   http_only: false,
@@ -50,6 +51,7 @@ export function Apps() {
         upstream_url: form.upstream_url,
         trusted_cidrs: split(form.trusted_cidrs),
         client_ip_header: form.client_ip_header,
+        root_redirect: form.root_redirect,
         retention_days: Number(form.retention_days),
         preserve_host: form.preserve_host,
         http_only: form.http_only,
@@ -284,6 +286,14 @@ export function Apps() {
                 reaching for HTTPS is refused rather than handed a certificate for a site that
                 was never meant to have one.
               </span>
+              <Field
+                label="Redirect / to"
+                value={form.root_redirect}
+                onChange={(v) => setForm({ ...form, root_redirect: v })}
+                placeholder="/geoserver/web/"
+                hint="Leave empty to proxy the root normally. An application that lives under a path can send visitors straight there; the redirect is still inspected and recorded."
+              />
+
               <div className="field" style={{ marginTop: 10 }}>
                 <label>Extra request headers</label>
                 {headers.map((h, i) => (
@@ -462,6 +472,7 @@ function Field({
   onChange,
   placeholder,
   required,
+  hint,
   type = 'text',
 }: {
   label: string
@@ -469,6 +480,7 @@ function Field({
   onChange: (v: string) => void
   placeholder?: string
   required?: boolean
+  hint?: string
   type?: string
 }) {
   const id = label.toLowerCase().replace(/[^a-z]+/g, '-')
@@ -484,6 +496,7 @@ function Field({
         required={required}
         onChange={(e) => onChange(e.target.value)}
       />
+      {hint && <span className="hint">{hint}</span>}
     </div>
   )
 }

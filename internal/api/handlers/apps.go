@@ -111,6 +111,13 @@ func validateApp(app *config.App) error {
 	if app.RetentionDays < 0 || app.RetentionDays > 3650 {
 		return errors.New("retention_days must be between 1 and 3650")
 	}
+	app.RootRedirect = strings.TrimSpace(app.RootRedirect)
+	if app.RootRedirect != "" && !strings.HasPrefix(app.RootRedirect, "/") {
+		return errors.New("root_redirect must be an absolute path beginning with /")
+	}
+	if isRoot(app.RootRedirect) {
+		return errors.New("root_redirect of / would redirect to itself")
+	}
 	kept := app.ExtraHeaders[:0]
 	for _, hdr := range app.ExtraHeaders {
 		hdr.Name = strings.TrimSpace(hdr.Name)
@@ -268,3 +275,7 @@ func maskHeaders(app config.App, admin bool) config.App {
 	app.ExtraHeaders = hidden
 	return app
 }
+
+// isRoot reports whether a path addresses the site root, which is where the
+// redirect starts and so cannot also be where it ends.
+func isRoot(path string) bool { return path == "/" }
