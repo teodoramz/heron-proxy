@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect width="64" height="64" rx="13" fill="#0f766e"/>
+  <!-- A heron: head and beak above, the long neck folded into an S, standing
+       in water. Drawn as one stroke so it survives being shrunk to 16px. -->
+  <path d="M44 15.5 L55 19 L44 22.5"
+        fill="#f4c542"/>
+  <path d="M44 19 C33 19 29 23.5 29 28.5 C29 33 33 35.5 36 38
+           C39 40.5 40.5 43.5 40.5 47"
+        fill="none" stroke="#ffffff" stroke-width="5.5"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="41.5" cy="17.5" r="2" fill="#0f766e"/>
+  <path d="M12 47 h40" stroke="#7fd4cb" stroke-width="4" stroke-linecap="round"/>
+  <path d="M18 55 h28" stroke="#7fd4cb" stroke-width="3" stroke-linecap="round" opacity="0.65"/>
+  <path d="M40.5 47 v4" stroke="#ffffff" stroke-width="4" stroke-linecap="round"/>
+</svg>
