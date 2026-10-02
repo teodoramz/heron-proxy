@@ -252,6 +252,16 @@ func (s *Server) buildUpstreamRequest(r *http.Request, app *config.App, body io.
 	out.Header.Set("X-Forwarded-Proto", e.Scheme)
 	out.Header.Set("X-Forwarded-Host", r.Host)
 	out.Header.Set("X-Request-Id", e.ID)
+
+	// Last, so an application that needs its own headers can override even the
+	// forwarding ones. Anything that frames the connection is refused when the
+	// app is saved and skipped again here.
+	for _, h := range app.ExtraHeaders {
+		if config.ValidHeaderName(h.Name) != nil || config.ValidHeaderValue(h.Value) != nil {
+			continue
+		}
+		out.Header.Set(h.Name, h.Value)
+	}
 	return out, nil
 }
 

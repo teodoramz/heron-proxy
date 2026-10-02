@@ -199,6 +199,7 @@ export interface App {
   upstream_url: string
   upstream_tls_verify: boolean
   http_only: boolean
+  extra_headers?: { name: string; value: string }[]
   preserve_host: boolean
   trusted_cidrs: string[]
   client_ip_header: string

@@ -756,3 +756,38 @@ func TestBlockingRaisesTheThresholdCorrectly(t *testing.T) {
 		t.Error("blocked below the threshold")
 	}
 }
+
+// An application that needs its own headers gets them, and they win over the
+// forwarding headers the proxy sets first.
+func TestExtraHeadersReachTheUpstream(t *testing.T) {
+	got := make(chan http.Header, 1)
+	h := newHarness(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got <- r.Header.Clone()
+	}), func(a *config.App) {
+		a.ExtraHeaders = []config.Header{
+			{Name: "X-Api-Key", Value: "s3cret"},
+			{Name: "X-Tenant", Value: "acme"},
+			{Name: "X-Request-Id", Value: "chosen-by-the-app"},
+			// Refused: these frame the connection, or belong to preserve_host.
+			{Name: "Host", Value: "not-this"},
+			{Name: "Transfer-Encoding", Value: "chunked"},
+		}
+	})
+
+	resp := h.get(t, "/")
+	resp.Body.Close()
+	hdr := <-got
+
+	if hdr.Get("X-Api-Key") != "s3cret" || hdr.Get("X-Tenant") != "acme" {
+		t.Errorf("extra headers missing: %v", hdr)
+	}
+	if hdr.Get("X-Request-Id") != "chosen-by-the-app" {
+		t.Errorf("an extra header did not override the proxy's: %q", hdr.Get("X-Request-Id"))
+	}
+	if hdr.Get("Transfer-Encoding") == "chunked" {
+		t.Error("a hop-by-hop header was taken from configuration")
+	}
+	if hdr.Get("Host") == "not-this" {
+		t.Error("Host was taken from configuration")
+	}
+}

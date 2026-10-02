@@ -1,7 +1,10 @@
 package config
 
 import (
+	"errors"
+	"fmt"
 	"net/netip"
+	"strings"
 	"time"
 )
 
@@ -52,6 +55,46 @@ func ValidMode(mode string) bool {
 	return mode == ModeDetect || mode == ModeBlock
 }
 
+// Header is one header the proxy adds to the upstream request. A slice rather
+// than a map, so the order the operator wrote them in is kept.
+type Header struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
+// reservedHeaders are never taken from configuration: Host has its own
+// setting, and the rest frame the connection.
+var reservedHeaders = map[string]bool{
+	"host": true, "connection": true, "keep-alive": true, "proxy-authenticate": true,
+	"proxy-connection": true, "te": true, "trailer": true, "transfer-encoding": true,
+	"upgrade": true, "content-length": true,
+}
+
+// ValidHeaderName reports whether a name can be set from configuration.
+func ValidHeaderName(name string) error {
+	if name == "" {
+		return errors.New("a header needs a name")
+	}
+	if reservedHeaders[strings.ToLower(name)] {
+		return fmt.Errorf("%s is set by the proxy and cannot be overridden here", name)
+	}
+	for _, r := range name {
+		// RFC 9110 token characters.
+		if r <= ' ' || r >= 0x7f || strings.ContainsRune(`"(),/:;<=>?@[\]{}`, r) {
+			return fmt.Errorf("%q is not a valid header name", name)
+		}
+	}
+	return nil
+}
+
+// ValidHeaderValue rejects a value that would split the request.
+func ValidHeaderValue(value string) error {
+	if strings.ContainsAny(value, "\r\n") {
+		return errors.New("a header value cannot contain a line break")
+	}
+	return nil
+}
+
 // App is one proxied application.
 type App struct {
 	ID                string   `json:"id"`
@@ -60,6 +103,9 @@ type App struct {
 	UpstreamURL       string   `json:"upstream_url"`
 	UpstreamTLSVerify bool     `json:"upstream_tls_verify"`
 	PreserveHost      bool     `json:"preserve_host"`
+	// ExtraHeaders are added to the upstream request, after the forwarding
+	// headers, so an application that needs its own can have them.
+	ExtraHeaders []Header `json:"extra_headers"`
 	// HTTPOnly serves this application over plain HTTP only. The proxy
 	// presents no certificate for its hostnames and mints none, so a client
 	// reaching for TLS is refused rather than handed a certificate for a site
@@ -136,6 +182,9 @@ func (a *App) ApplyDefaults() {
 	}
 	if a.WAF.ExtraRules == nil {
 		a.WAF.ExtraRules = []string{}
+	}
+	if a.ExtraHeaders == nil {
+		a.ExtraHeaders = []Header{}
 	}
 	if a.ClientIPHeader == "" {
 		a.ClientIPHeader = "X-Real-IP"

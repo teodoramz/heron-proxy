@@ -18,11 +18,15 @@ const BLANK = {
   mode: 'detect',
 }
 
+/** An empty row, so the form always offers one to fill in. */
+const BLANK_HEADER = { name: '', value: '' }
+
 export function Apps() {
   const [apps, setApps] = useState<App[]>([])
   const [certs, setCerts] = useState<Certificate[]>([])
   const [ca, setCA] = useState<CertificateAuthority>()
   const [form, setForm] = useState({ ...BLANK })
+  const [headers, setHeaders] = useState([{ ...BLANK_HEADER }])
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
 
@@ -50,6 +54,7 @@ export function Apps() {
         preserve_host: form.preserve_host,
         http_only: form.http_only,
         upstream_tls_verify: form.upstream_tls_verify,
+        extra_headers: headers.filter((h) => h.name.trim() !== '' || h.value !== ''),
         enabled: true,
         waf: {
           enabled: true,
@@ -60,6 +65,7 @@ export function Apps() {
       } as Partial<App>)
       setNotice(`Saved ${form.id}. The proxy picks it up within a few seconds.`)
       setForm({ ...BLANK })
+      setHeaders([{ ...BLANK_HEADER }])
       reload()
     } catch (err) {
       setError((err as Error).message)
@@ -136,6 +142,7 @@ export function Apps() {
                     <th>Hostnames</th>
                     <th>Upstream</th>
                     <th>Served on</th>
+                    <th className="num">Headers</th>
                     <th>Mode</th>
                     <th className="num">Paranoia</th>
                     <th className="num">Threshold</th>
@@ -150,6 +157,12 @@ export function Apps() {
                       <td className="clip" title={a.hostnames.join(', ')}>{a.hostnames.join(', ')}</td>
                       <td className="muted clip-wide" title={a.upstream_url}>{a.upstream_url}</td>
                       <td className="muted">{a.http_only ? 'http' : 'http + https'}</td>
+                      <td
+                        className="num muted"
+                        title={(a.extra_headers ?? []).map((h) => h.name).join(', ') || 'none'}
+                      >
+                        {a.extra_headers?.length || '—'}
+                      </td>
                       <td className={a.waf.mode === 'block' ? 'blocked-flag' : 'muted'}>
                         {a.waf.mode === 'block' ? 'enforcing' : 'detect only'}
                       </td>
@@ -271,6 +284,57 @@ export function Apps() {
                 reaching for HTTPS is refused rather than handed a certificate for a site that
                 was never meant to have one.
               </span>
+              <div className="field" style={{ marginTop: 10 }}>
+                <label>Extra request headers</label>
+                {headers.map((h, i) => (
+                  <div className="row" style={{ gap: 6, marginBottom: 6 }} key={i}>
+                    <input
+                      className="input"
+                      style={{ flex: '0 0 200px' }}
+                      placeholder="X-Api-Key"
+                      value={h.name}
+                      aria-label={`Header name ${i + 1}`}
+                      onChange={(e) =>
+                        setHeaders(headers.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))
+                      }
+                    />
+                    <input
+                      className="input"
+                      style={{ flex: 1 }}
+                      placeholder="value"
+                      value={h.value}
+                      aria-label={`Header value ${i + 1}`}
+                      onChange={(e) =>
+                        setHeaders(headers.map((x, j) => (j === i ? { ...x, value: e.target.value } : x)))
+                      }
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-sm"
+                      aria-label={`Remove header ${i + 1}`}
+                      onClick={() =>
+                        setHeaders(headers.length === 1 ? [{ ...BLANK_HEADER }] : headers.filter((_, j) => j !== i))
+                      }
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  onClick={() => setHeaders([...headers, { ...BLANK_HEADER }])}
+                >
+                  Add another header
+                </button>
+                <span className="hint" style={{ display: 'block', marginTop: 6 }}>
+                  Sent to the upstream with every request, after the forwarding headers, so they
+                  win if the names clash. <code>Host</code> and the headers that frame the
+                  connection are refused. Values are hidden from analysts, since they are usually
+                  credentials.
+                </span>
+              </div>
+
               <button className="btn btn-primary" type="submit">
                 Save application
               </button>

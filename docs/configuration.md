@@ -75,6 +75,7 @@ Set in the UI, stored in Postgres, applied by the proxy on its next poll.
 | `http_only` | Serve over plain HTTP only. No certificate is minted for its hostnames and none is presented, so a client reaching for TLS is refused. An uploaded certificate still wins. |
 | `client_ip_header` | Header carrying the real client address. Default `X-Real-IP`. |
 | `trusted_cidrs` | Ranges whose `X-Forwarded-For` is believed. Empty means trust none. |
+| `extra_headers` | Headers added to the upstream request, after the forwarding headers, so they win if the names clash. `Host` and the headers that frame the connection are refused. Values are hidden from analysts, since they are usually credentials for the upstream. |
 | `retention_days` | Overrides the 90-day default for this app's events. |
 
 ### Capture

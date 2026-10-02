@@ -936,3 +936,109 @@ func TestRuleCatalogueEndpoints(t *testing.T) {
 		t.Errorf("unknown rule = %d, want 404", resp.StatusCode)
 	}
 }
+
+// Anyone signed in may change their own password, but only with the current
+// one, so a borrowed session cannot lock the owner out.
+func TestChangeOwnPassword(t *testing.T) {
+	h := newHarness(t)
+	c := h.login(t, "selfserve", store.RoleAnalyst, nil)
+	const current = "correct-horse-battery-staple"
+
+	for _, tc := range []struct {
+		name, cur, next string
+		want            int
+	}{
+		{"the wrong current password", "not-it", "a-long-enough-password", http.StatusForbidden},
+		{"a new password that is too short", current, "short", http.StatusBadRequest},
+		{"the same password again", current, current, http.StatusBadRequest},
+		{"a good change", current, "an-entirely-new-password", http.StatusNoContent},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			resp := c.do(http.MethodPost, "/api/me/password",
+				map[string]string{"current_password": tc.cur, "new_password": tc.next})
+			defer resp.Body.Close()
+			if resp.StatusCode != tc.want {
+				t.Errorf("status = %d, want %d", resp.StatusCode, tc.want)
+			}
+		})
+	}
+
+	// The change really took: the old password no longer signs in, the new one does.
+	for _, tc := range []struct {
+		password string
+		want     int
+	}{
+		{current, http.StatusUnauthorized},
+		{"an-entirely-new-password", http.StatusOK},
+	} {
+		resp := c.do(http.MethodPost, "/api/auth/login",
+			map[string]string{"username": "selfserve", "password": tc.password})
+		resp.Body.Close()
+		if resp.StatusCode != tc.want {
+			t.Errorf("sign in with %q = %d, want %d", tc.password, resp.StatusCode, tc.want)
+		}
+	}
+}
+
+// An analyst can read the application list, so a header value — usually an
+// upstream credential — must not be in it.
+func TestExtraHeaderValuesAreHiddenFromAnalysts(t *testing.T) {
+	h := newHarness(t)
+	admin := h.login(t, "owner", store.RoleAdmin, nil)
+
+	admin.decode(admin.do(http.MethodPost, "/api/apps", map[string]any{
+		"id": "withheaders", "name": "With headers", "hostnames": []string{"wh.example"},
+		"upstream_url":  "http://127.0.0.1:9",
+		"extra_headers": []map[string]string{{"name": "X-Api-Key", "value": "s3cret"}},
+	}), http.StatusOK, nil)
+
+	var seen struct {
+		Apps []struct {
+			ID           string                         `json:"id"`
+			ExtraHeaders []struct{ Name, Value string } `json:"extra_headers"`
+		} `json:"apps"`
+	}
+	analyst := h.login(t, "reader2", store.RoleAnalyst, nil)
+	analyst.decode(analyst.get("/api/apps"), http.StatusOK, &seen)
+
+	for _, a := range seen.Apps {
+		if a.ID != "withheaders" {
+			continue
+		}
+		if len(a.ExtraHeaders) != 1 {
+			t.Fatalf("got %d headers", len(a.ExtraHeaders))
+		}
+		if a.ExtraHeaders[0].Name != "X-Api-Key" {
+			t.Errorf("the name should still be visible, got %q", a.ExtraHeaders[0].Name)
+		}
+		if a.ExtraHeaders[0].Value == "s3cret" {
+			t.Error("the value leaked to an analyst")
+		}
+		return
+	}
+	t.Fatal("the app was not in the list")
+}
+
+func TestExtraHeaderValidation(t *testing.T) {
+	h := newHarness(t)
+	c := h.login(t, "owner2", store.RoleAdmin, nil)
+
+	for _, tc := range []struct{ name, header, value string }{
+		{"Host", "Host", "elsewhere.example"},
+		{"a framing header", "Transfer-Encoding", "chunked"},
+		{"a name with a space", "X Bad", "x"},
+		{"a value with a line break", "X-Inject", "a\r\nX-Evil: 1"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			resp := c.do(http.MethodPost, "/api/apps", map[string]any{
+				"id": "bad", "name": "bad", "hostnames": []string{"bad.example"},
+				"upstream_url":  "http://127.0.0.1:9",
+				"extra_headers": []map[string]string{{"name": tc.header, "value": tc.value}},
+			})
+			defer resp.Body.Close()
+			if resp.StatusCode != http.StatusBadRequest {
+				t.Errorf("status = %d, want 400", resp.StatusCode)
+			}
+		})
+	}
+}

@@ -19,10 +19,11 @@ func (h *Handler) ListApps(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s := session(r)
+	admin := s.User.Role.AtLeast(store.RoleAdmin)
 	visible := make([]config.App, 0, len(apps))
 	for _, a := range apps {
 		if s.CanSeeApp(a.ID) {
-			visible = append(visible, a)
+			visible = append(visible, maskHeaders(a, admin))
 		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"apps": visible})
@@ -44,7 +45,7 @@ func (h *Handler) GetApp(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, app)
+	writeJSON(w, http.StatusOK, maskHeaders(app, session(r).User.Role.AtLeast(store.RoleAdmin)))
 }
 
 // SaveApp creates or updates an app.
@@ -110,6 +111,22 @@ func validateApp(app *config.App) error {
 	if app.RetentionDays < 0 || app.RetentionDays > 3650 {
 		return errors.New("retention_days must be between 1 and 3650")
 	}
+	kept := app.ExtraHeaders[:0]
+	for _, hdr := range app.ExtraHeaders {
+		hdr.Name = strings.TrimSpace(hdr.Name)
+		// A row left blank is how the form says "remove this one".
+		if hdr.Name == "" && hdr.Value == "" {
+			continue
+		}
+		if err := config.ValidHeaderName(hdr.Name); err != nil {
+			return err
+		}
+		if err := config.ValidHeaderValue(hdr.Value); err != nil {
+			return err
+		}
+		kept = append(kept, hdr)
+	}
+	app.ExtraHeaders = kept
 	app.ApplyDefaults()
 	return nil
 }
@@ -235,4 +252,19 @@ func (h *Handler) DeleteCertificate(w http.ResponseWriter, r *http.Request) {
 	}
 	h.audit(r, "certificate.delete", map[string]any{"id": id})
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// maskHeaders hides the values of an app's extra headers from anyone who
+// cannot edit them. They are usually credentials for the upstream, and the app
+// list is readable by any analyst.
+func maskHeaders(app config.App, admin bool) config.App {
+	if admin || len(app.ExtraHeaders) == 0 {
+		return app
+	}
+	hidden := make([]config.Header, len(app.ExtraHeaders))
+	for i, h := range app.ExtraHeaders {
+		hidden[i] = config.Header{Name: h.Name, Value: "[hidden]"}
+	}
+	app.ExtraHeaders = hidden
+	return app
 }
