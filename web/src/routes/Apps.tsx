@@ -26,8 +26,7 @@ export function Apps() {
   const [apps, setApps] = useState<App[]>([])
   const [certs, setCerts] = useState<Certificate[]>([])
   const [ca, setCA] = useState<CertificateAuthority>()
-  const [form, setForm] = useState({ ...BLANK })
-  const [headers, setHeaders] = useState([{ ...BLANK_HEADER }])
+  const [editing, setEditing] = useState('')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
 
@@ -38,41 +37,6 @@ export function Apps() {
   }, [])
 
   useEffect(reload, [reload])
-
-  async function save(e: React.FormEvent) {
-    e.preventDefault()
-    setError('')
-    setNotice('')
-    try {
-      await api.saveApp({
-        id: form.id,
-        name: form.name || form.id,
-        hostnames: split(form.hostnames),
-        upstream_url: form.upstream_url,
-        trusted_cidrs: split(form.trusted_cidrs),
-        client_ip_header: form.client_ip_header,
-        root_redirect: form.root_redirect,
-        retention_days: Number(form.retention_days),
-        preserve_host: form.preserve_host,
-        http_only: form.http_only,
-        upstream_tls_verify: form.upstream_tls_verify,
-        extra_headers: headers.filter((h) => h.name.trim() !== '' || h.value !== ''),
-        enabled: true,
-        waf: {
-          enabled: true,
-          mode: form.mode as 'detect' | 'block',
-          paranoia_level: Number(form.paranoia_level),
-          threshold: Number(form.threshold),
-        },
-      } as Partial<App>)
-      setNotice(`Saved ${form.id}. The proxy picks it up within a few seconds.`)
-      setForm({ ...BLANK })
-      setHeaders([{ ...BLANK_HEADER }])
-      reload()
-    } catch (err) {
-      setError((err as Error).message)
-    }
-  }
 
   return (
     <>
@@ -171,7 +135,10 @@ export function Apps() {
                       <td className="num">{a.waf.paranoia_level}</td>
                       <td className="num">{a.waf.threshold}</td>
                       <td className="num">{a.retention_days} d</td>
-                      <td className="num">
+                      <td className="actions nowrap">
+                        <button className="btn btn-sm" onClick={() => setEditing(editing === a.id ? '' : a.id)}>
+                          {editing === a.id ? 'Close' : 'Edit'}
+                        </button>{' '}
                         <button
                           className="btn btn-sm btn-danger"
                           onClick={() => api.deleteApp(a.id).then(reload)}
@@ -188,168 +155,28 @@ export function Apps() {
         </section>
 
         <div className="two-col">
-          <section className="panel">
-            <div className="panel-head">
-              <h2>Add an application</h2>
-            </div>
-            <form className="panel-body" onSubmit={save}>
-              <Field label="Identifier" value={form.id} onChange={(v) => setForm({ ...form, id: v })} required />
-              <Field label="Name" value={form.name} onChange={(v) => setForm({ ...form, name: v })} />
-              <Field
-                label="Hostnames (comma separated)"
-                value={form.hostnames}
-                onChange={(v) => setForm({ ...form, hostnames: v })}
-                placeholder="app.example.com, *.app.example.com"
-                required
-              />
-              <Field
-                label="Upstream URL"
-                value={form.upstream_url}
-                onChange={(v) => setForm({ ...form, upstream_url: v })}
-                placeholder="https://10.0.0.5:8443"
-                required
-              />
-              <Field
-                label="Trusted proxy ranges"
-                value={form.trusted_cidrs}
-                onChange={(v) => setForm({ ...form, trusted_cidrs: v })}
-                placeholder="10.0.0.0/8"
-              />
-              <Field
-                label="Client IP header"
-                value={form.client_ip_header}
-                onChange={(v) => setForm({ ...form, client_ip_header: v })}
-              />
-              <div className="row" style={{ gap: 12 }}>
-                <Field
-                  label="Paranoia level"
-                  value={String(form.paranoia_level)}
-                  onChange={(v) => setForm({ ...form, paranoia_level: Number(v) })}
-                  type="number"
-                />
-                <Field
-                  label="Anomaly threshold"
-                  value={String(form.threshold)}
-                  onChange={(v) => setForm({ ...form, threshold: Number(v) })}
-                  type="number"
-                />
-                <Field
-                  label="Retention (days)"
-                  value={String(form.retention_days)}
-                  onChange={(v) => setForm({ ...form, retention_days: Number(v) })}
-                  type="number"
-                />
-              </div>
-              <div className="field">
-                <label htmlFor="mode">What to do with a request over the threshold</label>
-                <select
-                  id="mode"
-                  className="select"
-                  value={form.mode}
-                  onChange={(e) => setForm({ ...form, mode: e.target.value })}
-                >
-                  <option value="detect">Record it and forward it anyway</option>
-                  <option value="block">Reject it with 403</option>
-                </select>
-                <span className="why muted">
-                  Start by recording. Check on Rule tuning what enforcing would have cost before
-                  turning it on.
-                </span>
-              </div>
-
-              <label className="row" style={{ gap: 6, marginBottom: 8 }}>
-                <input
-                  type="checkbox"
-                  checked={form.preserve_host}
-                  onChange={(e) => setForm({ ...form, preserve_host: e.target.checked })}
-                />
-                Send the original Host header upstream
-              </label>
-              <label className="row" style={{ gap: 6, marginBottom: 8 }}>
-                <input
-                  type="checkbox"
-                  checked={form.upstream_tls_verify}
-                  onChange={(e) => setForm({ ...form, upstream_tls_verify: e.target.checked })}
-                />
-                Verify the upstream TLS certificate
-              </label>
-              <label className="row" style={{ gap: 6, marginBottom: 4 }}>
-                <input
-                  type="checkbox"
-                  checked={form.http_only}
-                  onChange={(e) => setForm({ ...form, http_only: e.target.checked })}
-                />
-                Serve this application over plain HTTP only
-              </label>
-              <span className="hint" style={{ display: 'block', marginBottom: 12 }}>
-                No certificate is minted for its hostnames, and none is presented. A client
-                reaching for HTTPS is refused rather than handed a certificate for a site that
-                was never meant to have one.
-              </span>
-              <Field
-                label="Redirect / to"
-                value={form.root_redirect}
-                onChange={(v) => setForm({ ...form, root_redirect: v })}
-                placeholder="/geoserver/web/"
-                hint="Leave empty to proxy the root normally. An application that lives under a path can send visitors straight there; the redirect is still inspected and recorded."
-              />
-
-              <div className="field" style={{ marginTop: 10 }}>
-                <label>Extra request headers</label>
-                {headers.map((h, i) => (
-                  <div className="row" style={{ gap: 6, marginBottom: 6 }} key={i}>
-                    <input
-                      className="input"
-                      style={{ flex: '0 0 200px' }}
-                      placeholder="X-Api-Key"
-                      value={h.name}
-                      aria-label={`Header name ${i + 1}`}
-                      onChange={(e) =>
-                        setHeaders(headers.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))
-                      }
-                    />
-                    <input
-                      className="input"
-                      style={{ flex: 1 }}
-                      placeholder="value"
-                      value={h.value}
-                      aria-label={`Header value ${i + 1}`}
-                      onChange={(e) =>
-                        setHeaders(headers.map((x, j) => (j === i ? { ...x, value: e.target.value } : x)))
-                      }
-                    />
-                    <button
-                      type="button"
-                      className="btn btn-sm"
-                      aria-label={`Remove header ${i + 1}`}
-                      onClick={() =>
-                        setHeaders(headers.length === 1 ? [{ ...BLANK_HEADER }] : headers.filter((_, j) => j !== i))
-                      }
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-                <button
-                  type="button"
-                  className="btn btn-sm"
-                  onClick={() => setHeaders([...headers, { ...BLANK_HEADER }])}
-                >
-                  Add another header
-                </button>
-                <span className="hint" style={{ display: 'block', marginTop: 6 }}>
-                  Sent to the upstream with every request, after the forwarding headers, so they
-                  win if the names clash. <code>Host</code> and the headers that frame the
-                  connection are refused. Values are hidden from analysts, since they are usually
-                  credentials.
-                </span>
-              </div>
-
-              <button className="btn btn-primary" type="submit">
-                Save application
-              </button>
-            </form>
-          </section>
+        {editing ? (
+          // Keyed, so switching rows remounts the form with that app's values
+          // instead of keeping the previous one's.
+          <AppForm
+            key={editing}
+            app={apps.find((a) => a.id === editing)}
+            onSaved={(id) => {
+              setEditing('')
+              setNotice(`Saved ${id}. The proxy picks it up within a few seconds.`)
+              reload()
+            }}
+            onCancel={() => setEditing('')}
+          />
+        ) : (
+          <AppForm
+            key="new"
+            onSaved={(id) => {
+              setNotice(`Saved ${id}. The proxy picks it up within a few seconds.`)
+              reload()
+            }}
+          />
+        )}
 
           <section className="panel">
             <div className="panel-head">
@@ -473,6 +300,7 @@ function Field({
   placeholder,
   required,
   hint,
+  readOnly,
   type = 'text',
 }: {
   label: string
@@ -481,6 +309,7 @@ function Field({
   placeholder?: string
   required?: boolean
   hint?: string
+  readOnly?: boolean
   type?: string
 }) {
   const id = label.toLowerCase().replace(/[^a-z]+/g, '-')
@@ -494,6 +323,7 @@ function Field({
         value={value}
         placeholder={placeholder}
         required={required}
+        readOnly={readOnly}
         onChange={(e) => onChange(e.target.value)}
       />
       {hint && <span className="hint">{hint}</span>}
@@ -506,4 +336,258 @@ function split(v: string): string[] {
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean)
+}
+
+/**
+ * AppForm adds an application or edits one in place. The identifier names the
+ * row in storage, so it is fixed once the application exists.
+ */
+function AppForm({
+  app,
+  onSaved,
+  onCancel,
+}: {
+  app?: App
+  onSaved: (id: string) => void
+  onCancel?: () => void
+}) {
+  const [form, setForm] = useState(() => toForm(app))
+  const [headers, setHeaders] = useState(() =>
+    app?.extra_headers?.length ? app.extra_headers.map((h) => ({ ...h })) : [{ ...BLANK_HEADER }],
+  )
+  const [error, setError] = useState('')
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault()
+    setError('')
+    try {
+      await api.saveApp({
+        id: form.id,
+        name: form.name || form.id,
+        hostnames: split(form.hostnames),
+        upstream_url: form.upstream_url,
+        trusted_cidrs: split(form.trusted_cidrs),
+        client_ip_header: form.client_ip_header,
+        root_redirect: form.root_redirect,
+        retention_days: Number(form.retention_days),
+        preserve_host: form.preserve_host,
+        http_only: form.http_only,
+        upstream_tls_verify: form.upstream_tls_verify,
+        extra_headers: headers.filter((h) => h.name.trim() !== '' || h.value !== ''),
+        enabled: true,
+        waf: {
+          enabled: true,
+          mode: form.mode as 'detect' | 'block',
+          paranoia_level: Number(form.paranoia_level),
+          threshold: Number(form.threshold),
+        },
+      } as Partial<App>, Boolean(app))
+      if (!app) {
+        setForm(toForm(undefined))
+        setHeaders([{ ...BLANK_HEADER }])
+      }
+      onSaved(form.id)
+    } catch (err) {
+      setError((err as Error).message)
+    }
+  }
+
+  return (
+    <section className="panel">
+      <div className="panel-head">
+        <h2>{app ? `Edit ${app.id}` : 'Add an application'}</h2>
+        {onCancel && (
+          <button className="btn btn-sm" type="button" onClick={onCancel}>
+            Cancel
+          </button>
+        )}
+      </div>
+      <form className="panel-body" onSubmit={save}>
+        {error && <p className="error-msg">{error}</p>}
+          <Field
+            label="Identifier"
+            value={form.id}
+            onChange={(v) => setForm({ ...form, id: v })}
+            required
+            readOnly={Boolean(app)}
+            hint={app ? 'The identifier names this application everywhere it is recorded, so it cannot be changed.' : undefined}
+          />
+          <Field label="Name" value={form.name} onChange={(v) => setForm({ ...form, name: v })} />
+          <Field
+            label="Hostnames (comma separated)"
+            value={form.hostnames}
+            onChange={(v) => setForm({ ...form, hostnames: v })}
+            placeholder="app.example.com, *.app.example.com"
+            required
+          />
+          <Field
+            label="Upstream URL"
+            value={form.upstream_url}
+            onChange={(v) => setForm({ ...form, upstream_url: v })}
+            placeholder="https://10.0.0.5:8443"
+            required
+          />
+          <Field
+            label="Trusted proxy ranges"
+            value={form.trusted_cidrs}
+            onChange={(v) => setForm({ ...form, trusted_cidrs: v })}
+            placeholder="10.0.0.0/8"
+          />
+          <Field
+            label="Client IP header"
+            value={form.client_ip_header}
+            onChange={(v) => setForm({ ...form, client_ip_header: v })}
+          />
+          <div className="row" style={{ gap: 12 }}>
+            <Field
+              label="Paranoia level"
+              value={String(form.paranoia_level)}
+              onChange={(v) => setForm({ ...form, paranoia_level: Number(v) })}
+              type="number"
+            />
+            <Field
+              label="Anomaly threshold"
+              value={String(form.threshold)}
+              onChange={(v) => setForm({ ...form, threshold: Number(v) })}
+              type="number"
+            />
+            <Field
+              label="Retention (days)"
+              value={String(form.retention_days)}
+              onChange={(v) => setForm({ ...form, retention_days: Number(v) })}
+              type="number"
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="mode">What to do with a request over the threshold</label>
+            <select
+              id="mode"
+              className="select"
+              value={form.mode}
+              onChange={(e) => setForm({ ...form, mode: e.target.value })}
+            >
+              <option value="detect">Record it and forward it anyway</option>
+              <option value="block">Reject it with 403</option>
+            </select>
+            <span className="why muted">
+              Start by recording. Check on Rule tuning what enforcing would have cost before
+              turning it on.
+            </span>
+          </div>
+
+          <label className="row" style={{ gap: 6, marginBottom: 8 }}>
+            <input
+              type="checkbox"
+              checked={form.preserve_host}
+              onChange={(e) => setForm({ ...form, preserve_host: e.target.checked })}
+            />
+            Send the original Host header upstream
+          </label>
+          <label className="row" style={{ gap: 6, marginBottom: 8 }}>
+            <input
+              type="checkbox"
+              checked={form.upstream_tls_verify}
+              onChange={(e) => setForm({ ...form, upstream_tls_verify: e.target.checked })}
+            />
+            Verify the upstream TLS certificate
+          </label>
+          <label className="row" style={{ gap: 6, marginBottom: 4 }}>
+            <input
+              type="checkbox"
+              checked={form.http_only}
+              onChange={(e) => setForm({ ...form, http_only: e.target.checked })}
+            />
+            Serve this application over plain HTTP only
+          </label>
+          <span className="hint" style={{ display: 'block', marginBottom: 12 }}>
+            No certificate is minted for its hostnames, and none is presented. A client
+            reaching for HTTPS is refused rather than handed a certificate for a site that
+            was never meant to have one.
+          </span>
+          <Field
+            label="Redirect / to"
+            value={form.root_redirect}
+            onChange={(v) => setForm({ ...form, root_redirect: v })}
+            placeholder="/geoserver/web/"
+            hint="Leave empty to proxy the root normally. An application that lives under a path can send visitors straight there; the redirect is still inspected and recorded."
+          />
+
+          <div className="field" style={{ marginTop: 10 }}>
+            <label>Extra request headers</label>
+            {headers.map((h, i) => (
+              <div className="row" style={{ gap: 6, marginBottom: 6 }} key={i}>
+                <input
+                  className="input"
+                  style={{ flex: '0 0 200px' }}
+                  placeholder="X-Api-Key"
+                  value={h.name}
+                  aria-label={`Header name ${i + 1}`}
+                  onChange={(e) =>
+                    setHeaders(headers.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))
+                  }
+                />
+                <input
+                  className="input"
+                  style={{ flex: 1 }}
+                  placeholder="value"
+                  value={h.value}
+                  aria-label={`Header value ${i + 1}`}
+                  onChange={(e) =>
+                    setHeaders(headers.map((x, j) => (j === i ? { ...x, value: e.target.value } : x)))
+                  }
+                />
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  aria-label={`Remove header ${i + 1}`}
+                  onClick={() =>
+                    setHeaders(headers.length === 1 ? [{ ...BLANK_HEADER }] : headers.filter((_, j) => j !== i))
+                  }
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+            <button
+              type="button"
+              className="btn btn-sm"
+              onClick={() => setHeaders([...headers, { ...BLANK_HEADER }])}
+            >
+              Add another header
+            </button>
+            <span className="hint" style={{ display: 'block', marginTop: 6 }}>
+              Sent to the upstream with every request, after the forwarding headers, so they
+              win if the names clash. <code>Host</code> and the headers that frame the
+              connection are refused. Values are hidden from analysts, since they are usually
+              credentials.
+            </span>
+          </div>
+
+          <button className="btn btn-primary" type="submit">
+            Save application
+          </button>
+      </form>
+    </section>
+  )
+}
+
+/** toForm turns a stored application into the strings the form edits. */
+function toForm(app?: App) {
+  if (!app) return { ...BLANK }
+  return {
+    id: app.id,
+    name: app.name,
+    hostnames: (app.hostnames ?? []).join(', '),
+    upstream_url: app.upstream_url,
+    trusted_cidrs: (app.trusted_cidrs ?? []).join(', '),
+    client_ip_header: app.client_ip_header || 'X-Real-IP',
+    root_redirect: app.root_redirect ?? '',
+    retention_days: app.retention_days,
+    preserve_host: app.preserve_host,
+    http_only: app.http_only,
+    upstream_tls_verify: app.upstream_tls_verify,
+    paranoia_level: app.waf?.paranoia_level ?? 1,
+    threshold: app.waf?.threshold ?? 5,
+    mode: app.waf?.mode ?? 'detect',
+  }
 }

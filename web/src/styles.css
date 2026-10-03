@@ -801,3 +801,6 @@ table.data td.clip-wide { max-width: 40ch; overflow: hidden; text-overflow: elli
 .rail-who { color: var(--text); text-decoration: none; }
 .rail-who:hover { color: var(--accent); text-decoration: underline; }
 .ok-msg { color: var(--accent); font-size: 12px; margin: 0 0 10px; }
+
+/* A field that cannot be changed still has to look like part of the form. */
+.input[readonly] { background: var(--surface-2); color: var(--text-dim); cursor: default; }

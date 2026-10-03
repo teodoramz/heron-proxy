@@ -99,7 +99,10 @@ export const api = {
   ruleFacets: () => request<RuleFacets>('/api/rules/facets'),
 
   apps: () => request<{ apps: App[] }>('/api/apps'),
-  saveApp: (app: Partial<App>) => post<App>('/api/apps', app),
+  saveApp: (app: Partial<App>, update = false) =>
+    update
+      ? request<App>(`/api/apps/${app.id}`, { method: 'PUT', body: JSON.stringify(app) })
+      : post<App>('/api/apps', app),
   deleteApp: (id: string) => request<void>(`/api/apps/${id}`, { method: 'DELETE' }),
 
   certificateAuthority: () => request<CertificateAuthority>('/api/ca'),
