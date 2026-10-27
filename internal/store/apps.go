@@ -12,7 +12,7 @@ import (
 )
 
 const appColumns = `id, name, hostnames, upstream_url, upstream_tls_verify, preserve_host, http_only,
-	trusted_cidrs, client_ip_header, retention_days, capture, redaction, waf, extra_headers, root_redirect, enabled,
+	trusted_cidrs, client_ip_header, retention_days, capture, redaction, waf, extra_headers, no_log, root_redirect, enabled,
 	created_at, updated_at`
 
 // ListApps returns every configured app.
@@ -54,8 +54,8 @@ func (s *Store) SaveApp(ctx context.Context, app config.App) error {
 
 	_, err := s.pool.Exec(ctx, `
 		INSERT INTO apps (id, name, hostnames, upstream_url, upstream_tls_verify, preserve_host, http_only,
-			trusted_cidrs, client_ip_header, retention_days, capture, redaction, waf, extra_headers, root_redirect, enabled, updated_at)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16, now())
+			trusted_cidrs, client_ip_header, retention_days, capture, redaction, waf, extra_headers, no_log, root_redirect, enabled, updated_at)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17, now())
 		ON CONFLICT (id) DO UPDATE SET
 			name = EXCLUDED.name,
 			hostnames = EXCLUDED.hostnames,
@@ -70,11 +70,12 @@ func (s *Store) SaveApp(ctx context.Context, app config.App) error {
 			redaction = EXCLUDED.redaction,
 			waf = EXCLUDED.waf,
 			extra_headers = EXCLUDED.extra_headers,
+			no_log = EXCLUDED.no_log,
 			root_redirect = EXCLUDED.root_redirect,
 			enabled = EXCLUDED.enabled,
 			updated_at = now()`,
 		app.ID, app.Name, app.Hostnames, app.UpstreamURL, app.UpstreamTLSVerify, app.PreserveHost, app.HTTPOnly,
-		app.TrustedCIDRs, app.ClientIPHeader, app.RetentionDays, capture, redaction, wafPolicy, headers, app.RootRedirect, app.Enabled)
+		app.TrustedCIDRs, app.ClientIPHeader, app.RetentionDays, capture, redaction, wafPolicy, headers, app.NoLog, app.RootRedirect, app.Enabled)
 	if err != nil {
 		return fmt.Errorf("store: save app %s: %w", app.ID, err)
 	}
@@ -104,7 +105,7 @@ func scanApp(row scanner) (config.App, error) {
 	)
 	err := row.Scan(&app.ID, &app.Name, &app.Hostnames, &app.UpstreamURL, &app.UpstreamTLSVerify,
 		&app.PreserveHost, &app.HTTPOnly, &app.TrustedCIDRs, &app.ClientIPHeader, &app.RetentionDays,
-		&capture, &redaction, &wafPolicy, &headers, &app.RootRedirect, &app.Enabled,
+		&capture, &redaction, &wafPolicy, &headers, &app.NoLog, &app.RootRedirect, &app.Enabled,
 		&app.CreatedAt, &app.UpdatedAt)
 	if err != nil {
 		return config.App{}, err

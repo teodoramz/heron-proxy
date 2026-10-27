@@ -329,6 +329,9 @@ func (s *Server) finish(e *event.Event, tx *waf.Tx, body *bodyCapture, status in
 		e.WouldBlock = res.WouldBlock
 		e.WAFMS = uint32(res.Elapsed.Milliseconds())
 	}
+	if app, ok := s.opts.Router.ByID(e.AppID); ok && app.NoLog {
+		return
+	}
 	s.storeBody(e, body)
 	s.submit(e)
 }

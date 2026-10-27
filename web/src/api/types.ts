@@ -201,6 +201,7 @@ export interface App {
   http_only: boolean
   root_redirect?: string
   extra_headers?: { name: string; value: string }[]
+  no_log?: boolean
   preserve_host: boolean
   trusted_cidrs: string[]
   client_ip_header: string

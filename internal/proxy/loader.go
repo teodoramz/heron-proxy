@@ -67,15 +67,18 @@ func (l *Loader) Load(ctx context.Context) error {
 		return err
 	}
 	// The authority signs for hosts with no uploaded certificate, so a new
-	// application works before anyone prepares one.
-	if l.certs.CA() == nil {
-		ca, err := l.src.EnsureCA(ctx, "heron")
-		if err != nil {
+	// application works before anyone prepares one. It is read on every
+	// reload, since regenerating it bumps the configuration version too; the
+	// one in use, with its minted certificates, is kept unless it changed.
+	if ca, err := l.src.EnsureCA(ctx, "heron"); err != nil {
+		if l.certs.CA() == nil {
 			l.log.Warn("certificate authority unavailable; hosts without an uploaded certificate will fail", "err", err)
 		} else {
-			l.certs.SetCA(ca)
-			l.log.Info("certificate authority ready", "fingerprint", ca.Fingerprint()[:16])
+			l.log.Warn("certificate authority could not be re-read; keeping the one in use", "err", err)
 		}
+	} else if cur := l.certs.CA(); cur == nil || cur.Fingerprint() != ca.Fingerprint() {
+		l.certs.SetCA(ca)
+		l.log.Info("certificate authority ready", "fingerprint", ca.Fingerprint()[:16])
 	}
 
 	var plain []string

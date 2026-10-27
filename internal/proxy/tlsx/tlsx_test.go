@@ -281,6 +281,35 @@ func TestCACachesPerName(t *testing.T) {
 	}
 }
 
+// A cached certificate close to expiring is replaced, not served until it
+// lapses: the proxy can run for longer than a leaf lives.
+func TestCARenewsALeafNearExpiry(t *testing.T) {
+	ca, _ := NewCA("heron test authority")
+	first, _ := ca.Leaf("renew.example")
+	if until := time.Until(first.Leaf.NotAfter); until < leafLifetime-2*time.Hour {
+		t.Fatalf("a fresh leaf expires in %s, want about %s", until, leafLifetime)
+	}
+
+	// Age the cached copy to a day short of expiring.
+	first.Leaf.NotAfter = time.Now().Add(24 * time.Hour)
+	second, err := ca.Leaf("renew.example")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if second == first {
+		t.Fatal("a leaf a day from expiring was served again instead of renewed")
+	}
+	if time.Until(second.Leaf.NotAfter) <= leafRenewBefore {
+		t.Errorf("the renewed leaf expires in %s", time.Until(second.Leaf.NotAfter))
+	}
+	if third, _ := ca.Leaf("renew.example"); third != second {
+		t.Error("the renewed leaf was not cached")
+	}
+	if ca.Minted() != 1 {
+		t.Errorf("minted = %d, want the renewal to replace the old entry", ca.Minted())
+	}
+}
+
 func TestCARoundTripsThroughPEM(t *testing.T) {
 	original, _ := NewCA("heron test authority")
 	keyPEM, err := original.KeyPEM()

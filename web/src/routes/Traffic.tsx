@@ -21,17 +21,21 @@ import type { Filter, TrafficEvent } from '../api/types'
 const MAX_LIVE_ROWS = 2000
 
 /**
- * initialFilter seeds the view. Rule and app can arrive in the URL, which is how
- * "View requests" on the tuning page lands here already filtered.
+ * initialFilter seeds the view. Rule, app and source address can arrive in the
+ * URL, which is how "View requests" on the tuning page and "List every request
+ * from this address" land here already filtered. days widens the window.
  */
 function initialFilter(params: URLSearchParams, limit: number): Filter {
   const conditions = []
   const rule = params.get('rule')
   if (rule) conditions.push({ field: 'rule_id', op: 'has' as const, value: Number(rule) })
+  const ip = params.get('ip')
+  if (ip) conditions.push({ field: 'client_ip', op: 'eq' as const, value: ip })
   const app = params.get('app')
+  const days = Number(params.get('days'))
 
   return {
-    range: rule ? 7 * 24 * 60 : 60,
+    range: days > 0 ? days * 24 * 60 : rule || ip ? 7 * 24 * 60 : 60,
     apps: app ? [app] : undefined,
     root: { op: 'and', conditions },
     limit,
@@ -42,6 +46,12 @@ function initialFilter(params: URLSearchParams, limit: number): Filter {
 
 export function Traffic() {
   const [params] = useSearchParams()
+  // The filter is seeded from the URL once, so a link that changes the URL
+  // while Traffic is already open has to start a fresh view.
+  return <TrafficView key={params.toString()} params={params} />
+}
+
+function TrafficView({ params }: { params: URLSearchParams }) {
   const [pageSize, setPageSize] = useState(100)
   const [filter, setFilter] = useState<Filter>(() => initialFilter(params, 100))
   const [events, setEvents] = useState<TrafficEvent[]>([])

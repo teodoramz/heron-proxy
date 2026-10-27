@@ -2,9 +2,11 @@ package reader
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/netip"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -759,6 +761,22 @@ func TestUnknownSortFallsBackToTime(t *testing.T) {
 	for i := 1; i < len(page.Events); i++ {
 		if page.Events[i].TS.After(page.Events[i-1].TS) {
 			t.Error("did not fall back to newest-first by time")
+		}
+	}
+}
+
+// An address that tripped no rule, or sent nothing at all, still gets lists
+// the UI can map over, never null.
+func TestIPProfileListsAreNeverNull(t *testing.T) {
+	r := newReader(t)
+	for _, ip := range []string{"203.0.113.1", "192.0.2.250"} {
+		profile, err := r.IPProfile(context.Background(), fullRange(), ip, 10)
+		if err != nil {
+			t.Fatalf("IPProfile(%s): %v", ip, err)
+		}
+		body, _ := json.Marshal(profile)
+		if strings.Contains(string(body), "null") {
+			t.Errorf("IPProfile(%s) = %s, want no null lists", ip, body)
 		}
 	}
 }

@@ -110,6 +110,9 @@ type App struct {
 	// ExtraHeaders are added to the upstream request, after the forwarding
 	// headers, so an application that needs its own can have them.
 	ExtraHeaders []Header `json:"extra_headers"`
+	// NoLog proxies and inspects this application's traffic but records none
+	// of it: no event, no body, nothing on disk. Enforcement still applies.
+	NoLog bool `json:"no_log"`
 	// HTTPOnly serves this application over plain HTTP only. The proxy
 	// presents no certificate for its hostnames and mints none, so a client
 	// reaching for TLS is refused rather than handed a certificate for a site

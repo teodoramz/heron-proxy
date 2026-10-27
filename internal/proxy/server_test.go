@@ -869,3 +869,25 @@ func TestClientIPHeaderCanTargetAForwardingHeader(t *testing.T) {
 		t.Error("the other forwarding headers went missing")
 	}
 }
+
+func TestNoLogProxiesButRecordsNothing(t *testing.T) {
+	h := newHarness(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, "still served")
+	}), func(a *config.App) { a.NoLog = true })
+
+	req, _ := http.NewRequest(http.MethodPost, h.proxy.URL+"/", strings.NewReader(strings.Repeat("x", 64<<10)))
+	resp := h.do(t, req)
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if string(body) != "still served" {
+		t.Fatalf("body = %q, want the upstream's answer", body)
+	}
+
+	time.Sleep(100 * time.Millisecond)
+	h.sink.mu.Lock()
+	n := len(h.sink.events)
+	h.sink.mu.Unlock()
+	if n != 0 {
+		t.Fatalf("%d events recorded for an application that records nothing", n)
+	}
+}

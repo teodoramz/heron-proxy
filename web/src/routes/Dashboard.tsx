@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { api } from '../api/client'
 import { TrafficChart } from '../components/Chart'
 import { count, duration } from '../components/format'
@@ -191,7 +192,7 @@ function RankTable({
           <tr key={i}>
             {row.map((cell, j) => (
               <td key={j} className={isNum(j) ? 'num' : 'clip-wide'} title={cell}>
-                {j === 0 && link ? <a href={link(row)}>{cell}</a> : cell}
+                {j === 0 && link ? <Link to={link(row)}>{cell}</Link> : cell}
               </td>
             ))}
           </tr>

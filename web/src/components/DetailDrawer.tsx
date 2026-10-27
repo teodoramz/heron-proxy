@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { api, type ReplayResult } from '../api/client'
 import type { EventDetail } from '../api/types'
 import { bytes, duration, fullTime, statusClass } from './format'
+import { daysToCover, profileLink, requestsLink } from './sourceLinks'
 
 type Tab = 'overview' | 'request' | 'response' | 'waf' | 'client' | 'replay'
 
@@ -319,7 +321,11 @@ function ClientTab({ detail }: { detail: EventDetail }) {
       <dd>{detail.user_agent || '—'}</dd>
       <dt>All requests</dt>
       <dd>
-        <a href={`/ip/${encodeURIComponent(detail.client_ip)}`}>Open source profile</a>
+        <Link to={profileLink(detail.client_ip, detail.ts)}>Open source profile</Link>
+        {' · '}
+        <Link to={requestsLink(detail.client_ip, daysToCover(detail.ts))}>
+          List every request from this address
+        </Link>
       </dd>
     </dl>
   )

@@ -19,10 +19,12 @@ import (
 )
 
 // Leaf certificates are short-lived: they are minted on demand and cached in
-// memory, so there is nothing to rotate.
+// memory, and minted again once one gets within leafRenewBefore of expiring,
+// so a proxy that runs for months never serves an expired one.
 const (
-	leafLifetime = 30 * 24 * time.Hour
-	caLifetime   = 10 * 365 * 24 * time.Hour
+	leafLifetime    = 30 * 24 * time.Hour
+	leafRenewBefore = 7 * 24 * time.Hour
+	caLifetime      = 10 * 365 * 24 * time.Hour
 )
 
 // CA signs certificates for hostnames that have none uploaded.
@@ -122,7 +124,8 @@ func (c *CA) Fingerprint() string {
 // NotAfter is when the authority expires.
 func (c *CA) NotAfter() time.Time { return c.cert.NotAfter }
 
-// Leaf returns a certificate for a hostname, minting and caching one on first use.
+// Leaf returns a certificate for a hostname, minting and caching one on first
+// use and minting a fresh one when the cached one is close to expiring.
 func (c *CA) Leaf(host string) (*tls.Certificate, error) {
 	host = normalizeName(host)
 	if host == "" {
@@ -132,13 +135,13 @@ func (c *CA) Leaf(host string) (*tls.Certificate, error) {
 	c.mu.RLock()
 	cached, ok := c.minted[host]
 	c.mu.RUnlock()
-	if ok {
+	if ok && fresh(cached) {
 		return cached, nil
 	}
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if cached, ok := c.minted[host]; ok {
+	if cached, ok := c.minted[host]; ok && fresh(cached) {
 		return cached, nil
 	}
 	leaf, err := c.mint(host)
@@ -147,6 +150,11 @@ func (c *CA) Leaf(host string) (*tls.Certificate, error) {
 	}
 	c.minted[host] = leaf
 	return leaf, nil
+}
+
+// fresh reports whether a minted certificate has long enough left to keep serving.
+func fresh(cert *tls.Certificate) bool {
+	return cert.Leaf != nil && time.Until(cert.Leaf.NotAfter) > leafRenewBefore
 }
 
 func (c *CA) mint(host string) (*tls.Certificate, error) {

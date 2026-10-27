@@ -77,6 +77,7 @@ Set in the UI, stored in Postgres, applied by the proxy on its next poll.
 | `root_redirect` | Absolute path. A request for `/` is answered with a 302 to it instead of being forwarded, for an application that lives under a prefix. The request is still inspected, still counts against the threshold, and is still recorded. |
 | `trusted_cidrs` | Ranges whose `X-Forwarded-For` is believed. Empty means trust none. |
 | `extra_headers` | Headers added to the upstream request, after the forwarding headers, so they win if the names clash. `Host` and the headers that frame the connection are refused. Values are hidden from analysts, since they are usually credentials for the upstream. |
+| `no_log` | Proxy and inspect this application's traffic, but record none of it: no event, no request body, nothing in the blob store. Rules still run and an enforcing application still rejects. Off by default. |
 | `retention_days` | Overrides the 90-day default for this app's events. |
 
 ### Capture

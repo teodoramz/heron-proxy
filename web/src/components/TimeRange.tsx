@@ -24,7 +24,10 @@ const CLOCK = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-d
 /** describe says what window is in effect, in the reader's own timezone. */
 function describe(filter: Filter): string {
   if (filter.range) {
-    return QUICK.find((q) => q.minutes === filter.range)?.title ?? `Last ${filter.range} minutes`
+    const quick = QUICK.find((q) => q.minutes === filter.range)?.title
+    if (quick) return quick
+    const days = filter.range / (24 * 60)
+    return Number.isInteger(days) ? `Last ${days} days` : `Last ${filter.range} minutes`
   }
   if (!filter.from || !filter.to) return 'All recorded traffic'
   const from = new Date(filter.from)

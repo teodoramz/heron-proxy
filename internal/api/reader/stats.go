@@ -317,6 +317,18 @@ func (r *Reader) IPProfile(ctx context.Context, f query.Filter, ip string, limit
 	if profile.TopRules, err = r.TopRules(ctx, scoped, limit); err != nil {
 		return IPProfile{}, err
 	}
+	// Empty lists, never null: an address that tripped no rule is the common
+	// case, and the UI maps over every list.
+	if profile.Fingerprints == nil {
+		profile.Fingerprints = []GroupStat{}
+	}
+	if profile.TopPaths == nil {
+		profile.TopPaths = []GroupStat{}
+	}
+	if profile.TopRules == nil {
+		profile.TopRules = []RuleStat{}
+	}
+	profile.Stat.ClientIP = ip
 	return profile, nil
 }
 

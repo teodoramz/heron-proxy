@@ -17,6 +17,7 @@ const BLANK = {
   paranoia_level: 1,
   threshold: 5,
   mode: 'detect',
+  no_log: false,
 }
 
 /** An empty row, so the form always offers one to fill in. */
@@ -134,7 +135,9 @@ export function Apps() {
                       </td>
                       <td className="num">{a.waf.paranoia_level}</td>
                       <td className="num">{a.waf.threshold}</td>
-                      <td className="num">{a.retention_days} d</td>
+                      <td className={a.no_log ? 'muted' : 'num'}>
+                        {a.no_log ? 'not recorded' : `${a.retention_days} d`}
+                      </td>
                       <td className="actions nowrap">
                         <button className="btn btn-sm" onClick={() => setEditing(editing === a.id ? '' : a.id)}>
                           {editing === a.id ? 'Close' : 'Edit'}
@@ -374,6 +377,7 @@ function AppForm({
         http_only: form.http_only,
         upstream_tls_verify: form.upstream_tls_verify,
         extra_headers: headers.filter((h) => h.name.trim() !== '' || h.value !== ''),
+        no_log: form.no_log,
         enabled: true,
         waf: {
           enabled: true,
@@ -504,6 +508,18 @@ function AppForm({
             reaching for HTTPS is refused rather than handed a certificate for a site that
             was never meant to have one.
           </span>
+          <label className="row" style={{ gap: 6, marginBottom: 4 }}>
+            <input
+              type="checkbox"
+              checked={form.no_log}
+              onChange={(e) => setForm({ ...form, no_log: e.target.checked })}
+            />
+            Do not record this application's traffic
+          </label>
+          <span className="hint" style={{ display: 'block', marginBottom: 12 }}>
+            Requests are still proxied and checked against the rules, and still rejected if
+            enforcing, but nothing about them is written down: no event, no body.
+          </span>
           <Field
             label="Redirect / to"
             value={form.root_redirect}
@@ -589,5 +605,6 @@ function toForm(app?: App) {
     paranoia_level: app.waf?.paranoia_level ?? 1,
     threshold: app.waf?.threshold ?? 5,
     mode: app.waf?.mode ?? 'detect',
+    no_log: app.no_log ?? false,
   }
 }
